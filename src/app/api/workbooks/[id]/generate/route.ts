@@ -4,9 +4,56 @@ import { getCurrentUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
-// AI-powered workbook generation.
-// Input: { positionTitle, companyName, industry, context }
-// Output: complete workbook structure (job desc, duties, processes, SOPs, KRAs)
+// AI-powered workbook generation using Google Gemini (FREE tier: 1500 requests/day)
+// Requires GEMINI_API_KEY environment variable
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+
+async function callGemini(prompt: string): Promise<string> {
+  if (!GEMINI_API_KEY) {
+    throw new Error('AI belum dikonfigurasi. Hubungi administrator untuk set API key.')
+  }
+
+  const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 8192,
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    console.error('Gemini API error:', response.status, errText)
+    if (response.status === 429) {
+      throw new Error('Limit AI tercapai. Coba lagi beberapa menit lagi.')
+    }
+    throw new Error('AI error: ' + response.status)
+  }
+
+  const data = await response.json()
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  if (!text) throw new Error('AI tidak memberikan respons. Coba lagi.')
+  return text
+}
+
+function extractJSON(text: string): unknown {
+  // Remove markdown code blocks if present
+  let cleaned = text.replace(/```json\n?/g, '').replace(/```/g, '').trim()
+  // Find the first { or [ and last } or ]
+  const firstBrace = cleaned.search(/[{[]/)
+  const lastBrace = cleaned.lastIndexOf('}') > cleaned.lastIndexOf(']') ? cleaned.lastIndexOf('}') : cleaned.lastIndexOf(']')
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1)
+  }
+  return JSON.parse(cleaned)
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,11 +70,6 @@ export async function POST(
 
     const body = await req.json()
     const { section, positionTitle, companyName, industry, context } = body
-
-    // Dynamically import the SDK (backend only)
-    const ZAIModule = await import('z-ai-web-dev-sdk')
-    const ZAI = ZAIModule.default
-    const zai = await ZAI.create()
 
     const pos = positionTitle || workbook.positionTitle
     const comp = companyName || workbook.companyName
@@ -50,17 +92,8 @@ Kembalikan HANYA JSON valid (tanpa markdown, tanpa penjelasan) dengan struktur:
   "responsibilities": "5 butir tanggung jawab, dipisah newline (\\n)"
 }`
 
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: 'assistant', content: 'Anda adalah konsultan HR ahli yang menghasilkan JSON valid saja.' },
-          { role: 'user', content: prompt },
-        ],
-        thinking: { type: 'disabled' },
-      })
-      const content = completion.choices[0]?.message?.content || '{}'
-      const cleaned = content.replace(/```json\n?/g, '').replace(/```/g, '').trim()
-      const parsed = JSON.parse(cleaned)
-
+      const content = await callGemini(prompt)
+      const parsed = extractJSON(content) as Record<string, string>
       return NextResponse.json({ section: 'jobdesc', data: parsed })
     }
 
@@ -75,17 +108,8 @@ Kembalikan HANYA JSON valid:
   "dutiesMonthly": "tugas bulanan 1 kalimat"
 }`
 
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: 'assistant', content: 'Anda menghasilkan JSON valid saja, tanpa markdown.' },
-          { role: 'user', content: prompt },
-        ],
-        thinking: { type: 'disabled' },
-      })
-      const content = completion.choices[0]?.message?.content || '{}'
-      const cleaned = content.replace(/```json\n?/g, '').replace(/```/g, '').trim()
-      const parsed = JSON.parse(cleaned)
-
+      const content = await callGemini(prompt)
+      const parsed = extractJSON(content) as Record<string, string>
       return NextResponse.json({ section: 'duties', data: parsed })
     }
 
@@ -98,17 +122,8 @@ Kembalikan HANYA JSON valid (array):
   { "name": "...", "formula": "...", "target": "...", "unit": "%" }
 ]`
 
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: 'assistant', content: 'Anda menghasilkan JSON array valid saja, tanpa markdown.' },
-          { role: 'user', content: prompt },
-        ],
-        thinking: { type: 'disabled' },
-      })
-      const content = completion.choices[0]?.message?.content || '[]'
-      const cleaned = content.replace(/```json\n?/g, '').replace(/```/g, '').trim()
-      const parsed = JSON.parse(cleaned)
-
+      const content = await callGemini(prompt)
+      const parsed = extractJSON(content) as Array<{ name: string; formula: string; target: string; unit: string }>
       return NextResponse.json({ section: 'kra', data: parsed })
     }
 
@@ -145,31 +160,23 @@ Kembalikan HANYA JSON valid (array of proses):
   }
 ]`
 
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: 'assistant', content: 'Anda menghasilkan JSON array valid saja, tanpa markdown atau penjelasan.' },
-          { role: 'user', content: prompt },
-        ],
-        thinking: { type: 'disabled' },
-      })
-      const content = completion.choices[0]?.message?.content || '[]'
-      const cleaned = content.replace(/```json\n?/g, '').replace(/```/g, '').trim()
-      const parsed = JSON.parse(cleaned)
+      const content = await callGemini(prompt)
+      const parsed = extractJSON(content) as Array<Record<string, unknown>>
 
-      // Save processes to DB (replace existing)
+      // Save processes to DB
       await db.workbookProcess.deleteMany({ where: { workbookId: id } })
       for (let i = 0; i < parsed.length; i++) {
-        const p = parsed[i]
+        const p = parsed[i] as Record<string, unknown>
         await db.workbookProcess.create({
           data: {
             workbookId: id,
-            code: p.code,
-            name: p.name,
-            description: p.description || '',
-            inputText: p.inputText || '',
-            outputText: p.outputText || '',
-            totalSla: p.totalSla || '',
-            category: p.category || '',
+            code: String(p.code || `P${i + 1}`),
+            name: String(p.name || ''),
+            description: String(p.description || ''),
+            inputText: String(p.inputText || ''),
+            outputText: String(p.outputText || ''),
+            totalSla: String(p.totalSla || ''),
+            category: String(p.category || ''),
             lanesJson: JSON.stringify(p.lanes || []),
             stepsJson: JSON.stringify(p.steps || []),
             sopsJson: JSON.stringify(p.sops || []),
@@ -182,7 +189,7 @@ Kembalikan HANYA JSON valid (array of proses):
       return NextResponse.json({ section: 'processes', data: parsed, count: parsed.length })
     }
 
-    // ---------- FULL GENERATION (all sections) ----------
+    // ---------- FULL GENERATION ----------
     const prompt = `Anda adalah konsultan HR & BPMN ahli yang menyusun Buku Kerja Karyawan lengkap.
 Buat Buku Kerja lengkap untuk posisi "${pos}" di perusahaan "${comp}" (industri: ${ind}).
 ${ctx ? `Konteks: ${ctx}` : ''}
@@ -215,51 +222,43 @@ Kembalikan HANYA JSON valid (tanpa markdown) dengan struktur:
 
 Buat 4-6 proses. Setiap gateway WAJIB dua arah. SOP 5-7 langkah per proses.`
 
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: 'assistant', content: 'Anda menghasilkan JSON valid lengkap saja, tanpa markdown atau teks lain.' },
-        { role: 'user', content: prompt },
-      ],
-      thinking: { type: 'disabled' },
-    })
-    const content = completion.choices[0]?.message?.content || '{}'
-    const cleaned = content.replace(/```json\n?/g, '').replace(/```/g, '').trim()
-    const parsed = JSON.parse(cleaned)
+    const content = await callGemini(prompt)
+    const parsed = extractJSON(content) as Record<string, unknown>
 
     // Save everything to DB
     await db.workbook.update({
       where: { id },
       data: {
-        title: parsed.title || `Buku Kerja ${pos}`,
-        department: parsed.department || '',
-        reportsTo: parsed.reportsTo || '',
-        subordinates: parsed.subordinates || '',
-        purpose: parsed.purpose || '',
-        authority: parsed.authority || '',
-        responsibilities: parsed.responsibilities || '',
-        dutiesPrimary: parsed.dutiesPrimary || '',
-        dutiesDaily: parsed.dutiesDaily || '',
-        dutiesWeekly: parsed.dutiesWeekly || '',
-        dutiesMonthly: parsed.dutiesMonthly || '',
+        title: String(parsed.title || `Buku Kerja ${pos}`),
+        department: String(parsed.department || ''),
+        reportsTo: String(parsed.reportsTo || ''),
+        subordinates: String(parsed.subordinates || ''),
+        purpose: String(parsed.purpose || ''),
+        authority: String(parsed.authority || ''),
+        responsibilities: String(parsed.responsibilities || ''),
+        dutiesPrimary: String(parsed.dutiesPrimary || ''),
+        dutiesDaily: String(parsed.dutiesDaily || ''),
+        dutiesWeekly: String(parsed.dutiesWeekly || ''),
+        dutiesMonthly: String(parsed.dutiesMonthly || ''),
         krasJson: JSON.stringify(parsed.kras || []),
         companyName: comp,
       },
     })
 
-    if (parsed.processes && parsed.processes.length > 0) {
+    if (parsed.processes && Array.isArray(parsed.processes)) {
       await db.workbookProcess.deleteMany({ where: { workbookId: id } })
       for (let i = 0; i < parsed.processes.length; i++) {
-        const p = parsed.processes[i]
+        const p = parsed.processes[i] as Record<string, unknown>
         await db.workbookProcess.create({
           data: {
             workbookId: id,
-            code: p.code,
-            name: p.name,
-            description: p.description || '',
-            inputText: p.inputText || '',
-            outputText: p.outputText || '',
-            totalSla: p.totalSla || '',
-            category: p.category || '',
+            code: String(p.code || `P${i + 1}`),
+            name: String(p.name || ''),
+            description: String(p.description || ''),
+            inputText: String(p.inputText || ''),
+            outputText: String(p.outputText || ''),
+            totalSla: String(p.totalSla || ''),
+            category: String(p.category || ''),
             lanesJson: JSON.stringify(p.lanes || []),
             stepsJson: JSON.stringify(p.steps || []),
             sopsJson: JSON.stringify(p.sops || []),
@@ -273,8 +272,8 @@ Buat 4-6 proses. Setiap gateway WAJIB dua arah. SOP 5-7 langkah per proses.`
     return NextResponse.json({
       ok: true,
       section: 'full',
-      processesCount: parsed.processes?.length || 0,
-      krasCount: parsed.kras?.length || 0,
+      processesCount: Array.isArray(parsed.processes) ? parsed.processes.length : 0,
+      krasCount: Array.isArray(parsed.kras) ? parsed.kras.length : 0,
     })
   } catch (error) {
     console.error('Generate error:', error)
