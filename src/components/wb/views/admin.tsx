@@ -214,32 +214,42 @@ export function AdminView({ user }: { user: SessionUser }) {
               <Clock className="w-5 h-5" />
               Menunggu Persetujuan ({pendingUsers.length})
             </CardTitle>
-            <CardDescription>User yang sudah daftar tapi belum bisa login. Approve untuk mengizinkan login.</CardDescription>
+            <CardDescription>User yang sudah daftar tapi belum bisa login. Approve atau Reject.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {pendingUsers.map((u) => {
                 const initials = u.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
                 return (
-                  <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-                    <Avatar className="w-10 h-10 flex-shrink-0">
-                      <AvatarFallback className="text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm">{u.name}</div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Mail className="w-3 h-3" />{u.email}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground/70 mt-0.5">
-                        Daftar: {new Date(u.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  <div key={u.id} className="p-3 rounded-lg border bg-card space-y-3">
+                    {/* User info row */}
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10 flex-shrink-0">
+                        <AvatarFallback className="text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">{u.name}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Mail className="w-3 h-3" />{u.email}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground/70 mt-0.5">
+                          Daftar: {new Date(u.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => approveUser(u)} className="bg-green-600 hover:bg-green-700">
-                      <UserCheck className="w-4 h-4 mr-1" />
-                      Approve
-                    </Button>
+                    {/* Action buttons row - always visible */}
+                    <div className="flex gap-2 pl-13">
+                      <Button size="sm" onClick={() => approveUser(u)} className="bg-green-600 hover:bg-green-700 flex-1">
+                        <UserCheck className="w-4 h-4 mr-1" />
+                        Approve
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleDelete(u)} className="text-red-600 border-red-300 hover:bg-red-50 flex-1">
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Reject & Hapus
+                      </Button>
+                    </div>
                   </div>
                 )
               })}
@@ -267,116 +277,112 @@ export function AdminView({ user }: { user: SessionUser }) {
         </CardHeader>
         <CardContent>
           <ScrollArea className="max-h-[600px]">
-            <div className="space-y-2">
+            <div className="space-y-3">
               {filtered.map((u) => {
                 const cfg = roleConfig[u.role] || roleConfig.USER
                 const initials = u.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
                 const isSelf = u.id === user.id
+                const canManage = u.role !== 'MASTER_ADMIN' && !isSelf
                 return (
-                  <div key={u.id} className={`flex items-center gap-3 p-3 rounded-lg border ${u.isBlocked ? 'opacity-60 bg-red-50/30 dark:bg-red-950/10' : 'hover:bg-muted/30'}`}>
-                    <Avatar className="w-10 h-10 flex-shrink-0">
-                      <AvatarFallback className={`text-xs font-semibold ${cfg.bg} ${cfg.color}`}>
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{u.name}</span>
-                        {isSelf && <Badge variant="outline" className="text-[10px]">Anda</Badge>}
-                        <Badge variant="outline" className={`text-[10px] ${cfg.color} ${cfg.bg} border-0`}>
-                          <cfg.icon className="w-3 h-3 mr-0.5" />
-                          {cfg.label}
-                        </Badge>
-                        {u.isApproved ? (
-                          <Badge variant="outline" className="text-[10px] text-green-600 bg-green-100 dark:bg-green-950/40 border-0">
-                            <CheckCircle2 className="w-3 h-3 mr-0.5" />Approved
+                  <div key={u.id} className={`p-3 rounded-lg border space-y-2 ${u.isBlocked ? 'opacity-60 bg-red-50/30 dark:bg-red-950/10' : 'hover:bg-muted/30'}`}>
+                    {/* User info row */}
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10 flex-shrink-0">
+                        <AvatarFallback className={`text-xs font-semibold ${cfg.bg} ${cfg.color}`}>
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm">{u.name}</span>
+                          {isSelf && <Badge variant="outline" className="text-[10px]">Anda</Badge>}
+                          <Badge variant="outline" className={`text-[10px] ${cfg.color} ${cfg.bg} border-0`}>
+                            <cfg.icon className="w-3 h-3 mr-0.5" />
+                            {cfg.label}
                           </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] text-amber-600 bg-amber-100 dark:bg-amber-950/40 border-0">
-                            <Clock className="w-3 h-3 mr-0.5" />Pending
-                          </Badge>
-                        )}
-                        {u.isBlocked && (
-                          <Badge variant="outline" className="text-[10px] text-red-600 bg-red-100 dark:bg-red-950/40 border-0">
-                            <Ban className="w-3 h-3 mr-0.5" />Diblokir
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                        <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{u.email}</span>
-                        <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(u.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                        <span>{u._count.workbooks} workbook</span>
+                          {u.isApproved ? (
+                            <Badge variant="outline" className="text-[10px] text-green-600 bg-green-100 dark:bg-green-950/40 border-0">
+                              <CheckCircle2 className="w-3 h-3 mr-0.5" />Approved
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-amber-600 bg-amber-100 dark:bg-amber-950/40 border-0">
+                              <Clock className="w-3 h-3 mr-0.5" />Pending
+                            </Badge>
+                          )}
+                          {u.isBlocked && (
+                            <Badge variant="outline" className="text-[10px] text-red-600 bg-red-100 dark:bg-red-950/40 border-0">
+                              <Ban className="w-3 h-3 mr-0.5" />Diblokir
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                          <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{u.email}</span>
+                          <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(u.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          <span>{u._count.workbooks} workbook</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-1 flex-shrink-0">
-                      {/* Approve/Revoke */}
-                      {u.role !== 'MASTER_ADMIN' && !isSelf && (
-                        !u.isApproved ? (
+                    {/* Action buttons row - always visible, wraps on small screens */}
+                    {canManage && (
+                      <div className="flex gap-1.5 flex-wrap pl-1">
+                        {/* Approve/Revoke */}
+                        {!u.isApproved ? (
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs text-green-600 border-green-300 hover:bg-green-50"
                             onClick={() => approveUser(u)}
                             title="Approve user"
                           >
-                            <UserCheck className="w-4 h-4 text-green-600" />
+                            <UserCheck className="w-3.5 h-3.5 mr-1" />Approve
                           </Button>
                         ) : (
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs text-amber-600 border-amber-300 hover:bg-amber-50"
                             onClick={() => revokeApproval(u)}
                             title="Cabut approval"
                           >
-                            <Clock className="w-4 h-4 text-amber-600" />
+                            <Clock className="w-3.5 h-3.5 mr-1" />Revoke
                           </Button>
-                        )
-                      )}
-                      {/* Block/Unblock */}
-                      {u.role !== 'MASTER_ADMIN' && !isSelf && (
+                        )}
+                        {/* Block/Unblock */}
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
                           onClick={() => toggleBlock(u)}
                           title={u.isBlocked ? 'Unblock' : 'Block'}
                         >
-                          {u.isBlocked ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <Ban className="w-4 h-4 text-red-600" />}
+                          {u.isBlocked ? <><CheckCircle2 className="w-3.5 h-3.5 mr-1 text-green-600" />Unblock</> : <><Ban className="w-3.5 h-3.5 mr-1 text-red-600" />Block</>}
                         </Button>
-                      )}
-                      {/* Role change (MASTER_ADMIN only) */}
-                      {isMasterAdmin && u.role !== 'MASTER_ADMIN' && !isSelf && (
-                        <Select
-                          value={u.role}
-                          onValueChange={(v) => changeRole(u, v)}
-                        >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <ShieldCheck className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                          </DropdownMenu>
-                          <SelectContent>
-                            <SelectItem value="USER">User</SelectItem>
-                            <SelectItem value="ADMIN">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                      {/* Delete (ADMIN can delete USER, MASTER_ADMIN can delete USER+ADMIN) */}
-                      {u.role !== 'MASTER_ADMIN' && !isSelf && (isMasterAdmin || u.role === 'USER') && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-red-600"
-                          onClick={() => handleDelete(u)}
-                          title="Hapus"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
+                        {/* Role change (MASTER_ADMIN only) */}
+                        {isMasterAdmin && u.role !== 'MASTER_ADMIN' && (
+                          <Select value={u.role} onValueChange={(v) => changeRole(u, v)}>
+                            <SelectTrigger className="h-7 w-[100px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="USER" className="text-xs">User</SelectItem>
+                              <SelectItem value="ADMIN" className="text-xs">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {/* Delete */}
+                        {(isMasterAdmin || u.role === 'USER') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50"
+                            onClick={() => handleDelete(u)}
+                            title="Hapus akun"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 mr-1" />Hapus
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}
