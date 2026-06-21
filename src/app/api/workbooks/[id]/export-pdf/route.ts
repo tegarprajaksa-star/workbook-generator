@@ -13,6 +13,7 @@ import { existsSync } from 'fs'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import { generateBpmnSvg, type BpmnStep as BpmnStepT } from '@/lib/bpmn-svg'
+import { renderSvgToPng } from '@/lib/svg-render'
 
 const execAsync = promisify(exec)
 
@@ -32,11 +33,7 @@ async function bpmnSvgToPng(lanes: string[], steps: Step[], accentColor: string)
   if (steps.length === 0 || lanes.length === 0) return null
   try {
     const svg = generateBpmnSvg(lanes, steps as unknown as BpmnStepT[], accentColor)
-    // Render at 2x density for crisp text
-    const pngBuffer = await sharp(Buffer.from(svg), { density: 192 })
-      .resize({ width: 1600, fit: 'inside' })
-      .png()
-      .toBuffer()
+    const pngBuffer = await renderSvgToPng(svg, { scale: 2 })
     return pngBuffer
   } catch (err) {
     console.error('BPMN SVG to PNG error:', err)
@@ -369,23 +366,43 @@ export async function GET(
     // Convert DOCX to PDF using LibreOffice
     const tmpDir = '/tmp/bpm-pdf-export'
     if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true })
-    const docxPath = join(tmpDir, `${safeName}.docx`)
+    // Use a unique filename to avoid conflicts with concurrent requests
+    const fileStamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const docxPath = join(tmpDir, `${safeName}-${fileStamp}.docx`)
     await writeFile(docxPath, docxBuffer)
 
-    try {
-      await execAsync(
-        `soffice --headless --convert-to pdf --outdir "${tmpDir}" "${docxPath}"`,
-        { timeout: 30000 }
-      )
-    } catch (err) {
-      console.error('LibreOffice conversion error:', err)
-      // Cleanup and return error
-      await unlink(docxPath).catch(() => {})
-      return NextResponse.json({ error: 'Gagal konversi ke PDF' }, { status: 500 })
+    // LibreOffice needs a HOME directory for font config; set it explicitly
+    const env = { ...process.env, HOME: '/tmp', USERPROFILE: '/tmp' }
+
+    let pdfConverted = false
+    // Try conversion with retries (LibreOffice can be slow on first launch)
+    for (let attempt = 1; attempt <= 3 && !pdfConverted; attempt++) {
+      try {
+        await execAsync(
+          `soffice --headless --norestore --nodefault --convert-to pdf --outdir "${tmpDir}" "${docxPath}"`,
+          { timeout: 60000, env }
+        )
+        // Verify the PDF was actually created
+        const pdfPath = join(tmpDir, `${safeName}-${fileStamp}.pdf`)
+        if (existsSync(pdfPath)) {
+          pdfConverted = true
+        }
+      } catch (err) {
+        console.error(`LibreOffice attempt ${attempt} error:`, err)
+        if (attempt === 3) {
+          await unlink(docxPath).catch(() => {})
+          return NextResponse.json(
+            { error: 'Gagal konversi ke PDF setelah 3 percobaan. Silakan coba lagi.' },
+            { status: 500 }
+          )
+        }
+        // Wait before retry
+        await new Promise(r => setTimeout(r, 2000))
+      }
     }
 
-    const pdfPath = join(tmpDir, `${safeName}.pdf`)
-    if (!existsSync(pdfPath)) {
+    const pdfPath = join(tmpDir, `${safeName}-${fileStamp}.pdf`)
+    if (!pdfConverted || !existsSync(pdfPath)) {
       await unlink(docxPath).catch(() => {})
       return NextResponse.json({ error: 'PDF tidak ter-generate' }, { status: 500 })
     }

@@ -8,6 +8,7 @@ import {
 } from 'docx'
 import sharp from 'sharp'
 import { generateBpmnSvg, type BpmnStep as BpmnStepT } from '@/lib/bpmn-svg'
+import { renderSvgToPng } from '@/lib/svg-render'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,16 +22,12 @@ function lines(text: string): string[] {
   return (text || '').split('\n').map(s => s.trim()).filter(Boolean)
 }
 
-// Convert BPMN SVG to PNG buffer for embedding in DOCX
+// Convert BPMN SVG to PNG buffer using Playwright (reliable font rendering)
 async function bpmnSvgToPng(lanes: string[], steps: Step[], accentColor: string): Promise<Buffer | null> {
   if (steps.length === 0 || lanes.length === 0) return null
   try {
     const svg = generateBpmnSvg(lanes, steps as unknown as BpmnStepT[], accentColor)
-    // Render at 2x density for crisp text, then resize to target width
-    const pngBuffer = await sharp(Buffer.from(svg), { density: 192 })
-      .resize({ width: 1600, fit: 'inside' })
-      .png()
-      .toBuffer()
+    const pngBuffer = await renderSvgToPng(svg, { scale: 2 })
     return pngBuffer
   } catch (err) {
     console.error('BPMN SVG to PNG error:', err)

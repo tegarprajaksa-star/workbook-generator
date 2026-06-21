@@ -167,3 +167,30 @@ Stage Summary:
 - Font rendering issue fixed in all export formats (PPT, DOC, PDF)
 - BPMN diagrams now render with crisp, readable text using DejaVu Sans font at 2x density
 - No more garbled/square characters — all text including SLA pills and branch labels is legible
+
+---
+Task ID: 8
+Agent: Orchestrator
+Task: Fix garbled font in BPMN exports (definitive) + fix PDF generation
+
+Work Log:
+- Root cause: sharp's SVG renderer (librsvg) produces garbled/box characters for text in headless environments, even with DejaVu Sans font
+- Solution: switched SVG→PNG rendering from sharp to Playwright (Chromium browser engine) which guarantees correct font rendering
+- Installed playwright locally + chromium browser
+- Created src/lib/svg-render.ts with renderSvgToPng() using headless Chromium:
+  - Caches browser instance across calls for performance
+  - Renders at 2x device scale factor for crisp text
+  - Waits for document.fonts.ready before screenshot
+- Updated all 3 export routes (DOCX, PPTX, PDF) to use renderSvgToPng instead of sharp for SVG→PNG
+- Fixed PDF generation reliability:
+  - Added unique filename per request (avoid concurrent conflicts)
+  - Set HOME=/tmp env for LibreOffice font config
+  - Added --norestore --nodefault flags
+  - Retry logic: 3 attempts with 2s delay between
+  - Increased timeout to 60s
+- VLM verified all 3 exports: DOCX, PPTX, PDF — all BPMN text fully readable (roles, tasks, gateways, SLA labels, YA/TIDAK branches)
+
+Stage Summary:
+- Font rendering definitively fixed: Playwright/Chromium renders text perfectly, no more garbled/box characters
+- PDF export now reliable with retry logic and proper environment setup
+- All 3 export formats (PPTX, DOCX, PDF) show clean, readable BPMN diagrams

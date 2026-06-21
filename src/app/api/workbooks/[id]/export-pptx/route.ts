@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth'
 import pptxgen from 'pptxgenjs'
 import sharp from 'sharp'
 import { generateBpmnSvg, type BpmnStep as BpmnStepT } from '@/lib/bpmn-svg'
+import { renderSvgToPng } from '@/lib/svg-render'
 
 export const dynamic = 'force-dynamic'
 
@@ -180,13 +181,10 @@ export async function GET(
         ps2.addText(`${proc.code} — Alur Proses (BPMN 2.0)`, { x: 0.5, y: 0.3, w: 12, h: 0.6, fontSize: 24, bold: true, color: accent })
         ps2.addShape('rect', { x: 0.5, y: 0.9, w: 12.3, h: 0.03, fill: { color: accent } })
 
-        // Generate BPMN diagram as PNG and embed
+        // Generate BPMN diagram as PNG using Playwright (reliable font rendering) and embed
         try {
           const svg = generateBpmnSvg(lanes, steps as unknown as BpmnStepT[], wb.accentColor || '#b45309')
-          const pngBuffer = await sharp(Buffer.from(svg), { density: 192 })
-            .resize({ width: 1800, fit: 'inside' })
-            .png()
-            .toBuffer()
+          const pngBuffer = await renderSvgToPng(svg, { scale: 2 })
           const meta = await sharp(pngBuffer).metadata()
           const imgW = 12.3 // inches
           const ratio = (meta.height || 600) / (meta.width || 1800)
