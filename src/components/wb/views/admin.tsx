@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   Loader2, Users, Plus, Trash2, Ban, CheckCircle2, Shield, Crown,
-  Search, Mail, Calendar, MoreVertical, Pencil, ShieldCheck, ShieldX, Clock, UserCheck,
+  Search, Mail, Calendar, MoreVertical, Pencil, ShieldCheck, ShieldX, Clock, UserCheck, KeyRound, Copy,
 } from 'lucide-react'
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -38,6 +38,16 @@ type AdminUser = {
   _count: { workbooks: number; sessions: number }
 }
 
+type TokenItem = {
+  id: string
+  token: string
+  note: string
+  usedByUserId: string | null
+  usedAt: string | null
+  createdAt: string
+  createdBy: { name: string } | null
+}
+
 const roleConfig: Record<string, { label: string; color: string; bg: string; icon: typeof Crown }> = {
   MASTER_ADMIN: { label: 'Master Admin', color: 'text-amber-700', bg: 'bg-amber-100 dark:bg-amber-950/40', icon: Crown },
   ADMIN: { label: 'Admin', color: 'text-stone-700', bg: 'bg-stone-100 dark:bg-stone-800/40', icon: Shield },
@@ -51,12 +61,19 @@ export function AdminView({ user }: { user: SessionUser }) {
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'USER' })
   const [creating, setCreating] = useState(false)
+  const [tokens, setTokens] = useState<TokenItem[]>([])
+  const [tokenCount, setTokenCount] = useState('1')
+  const [tokenNote, setTokenNote] = useState('')
+  const [generatingTokens, setGeneratingTokens] = useState(false)
 
   const load = useCallback(() => {
     api<{ users: AdminUser[] }>('/admin/users')
       .then((d) => setUsers(d.users))
       .catch(() => toast.error('Gagal memuat data user'))
       .finally(() => setLoading(false))
+    api<{ tokens: TokenItem[] }>('/admin/tokens')
+      .then((d) => setTokens(d.tokens))
+      .catch(() => {})
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -142,6 +159,28 @@ export function AdminView({ user }: { user: SessionUser }) {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal')
     }
+  }
+
+  async function generateTokens() {
+    setGeneratingTokens(true)
+    try {
+      const result = await api<{ tokens: TokenItem[]; count: number }>('/admin/tokens', {
+        method: 'POST',
+        body: JSON.stringify({ count: parseInt(tokenCount) || 1, note: tokenNote }),
+      })
+      toast.success(`${result.count} token berhasil dibuat!`)
+      setTokenNote('')
+      load()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal membuat token')
+    } finally {
+      setGeneratingTokens(false)
+    }
+  }
+
+  function copyToken(token: string) {
+    navigator.clipboard.writeText(token)
+    toast.success(`Token ${token} disalin!`)
   }
 
   const filtered = users.filter(u =>
@@ -257,6 +296,93 @@ export function AdminView({ user }: { user: SessionUser }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Token Management Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <KeyRound className="w-5 h-5 text-primary" />
+            Token Registrasi
+          </CardTitle>
+          <CardDescription>
+            Generate token untuk user baru. Tanpa token, user tidak bisa mendaftar.
+            Bagikan token ke user yang ingin Anda izinkan mendaftar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Generate form */}
+          <div className="flex flex-col sm:flex-row gap-2 items-end">
+            <div className="space-y-1 flex-1">
+              <Label className="text-xs">Jumlah Token</Label>
+              <Input
+                type="number"
+                min="1"
+                max="50"
+                value={tokenCount}
+                onChange={(e) => setTokenCount(e.target.value)}
+                className="w-full sm:w-24"
+              />
+            </div>
+            <div className="space-y-1 flex-1">
+              <Label className="text-xs">Catatan (opsional)</Label>
+              <Input
+                type="text"
+                placeholder="Misal: untuk tim sales"
+                value={tokenNote}
+                onChange={(e) => setTokenNote(e.target.value)}
+              />
+            </div>
+            <Button onClick={generateTokens} disabled={generatingTokens} className="flex-shrink-0">
+              {generatingTokens ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+              Generate Token
+            </Button>
+          </div>
+
+          {/* Token list */}
+          {tokens.length > 0 && (
+            <div className="space-y-2 mt-4">
+              <h4 className="text-sm font-semibold">Daftar Token ({tokens.length})</h4>
+              <ScrollArea className="max-h-64">
+                <div className="space-y-2">
+                  {tokens.map((t) => (
+                    <div key={t.id} className={`flex items-center gap-2 p-2.5 rounded-lg border ${t.usedByUserId ? 'opacity-50' : 'hover:bg-muted/30'}`}>
+                      <code className={`text-sm font-mono flex-1 ${t.usedByUserId ? 'line-through text-muted-foreground' : 'font-semibold'}`}>
+                        {t.token}
+                      </code>
+                      {t.note && <span className="text-xs text-muted-foreground hidden sm:inline truncate max-w-32">{t.note}</span>}
+                      {t.usedByUserId ? (
+                        <Badge variant="outline" className="text-[10px] text-stone-500 bg-muted border-0">
+                          Sudah Dipakai
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-green-600 bg-green-100 dark:bg-green-950/40 border-0">
+                          Aktif
+                        </Badge>
+                      )}
+                      {!t.usedByUserId && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => copyToken(t.token)}
+                          title="Copy token"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+          {tokens.length === 0 && (
+            <div className="text-center py-6 text-sm text-muted-foreground border border-dashed rounded-lg">
+              Belum ada token. Generate token di atas untuk memulai.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Search */}
       <div className="relative max-w-md">

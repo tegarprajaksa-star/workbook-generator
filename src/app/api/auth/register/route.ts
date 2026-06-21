@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { hashPassword } from '@/lib/auth'
+import { hashPassword, randomBytes } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { name, email, password } = body
+    const { name, email, password, registrationToken } = body
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -19,6 +19,33 @@ export async function POST(req: NextRequest) {
     if (password.length < 6) {
       return NextResponse.json(
         { error: 'Password minimal 6 karakter' },
+        { status: 400 }
+      )
+    }
+
+    // Require registration token
+    if (!registrationToken || registrationToken.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Token registrasi wajib diisi. Hubungi admin untuk mendapatkan token.' },
+        { status: 400 }
+      )
+    }
+
+    // Validate token
+    const tokenRecord = await db.registrationToken.findUnique({
+      where: { token: registrationToken.trim() },
+    })
+
+    if (!tokenRecord) {
+      return NextResponse.json(
+        { error: 'Token tidak valid. Hubungi admin untuk mendapatkan token yang benar.' },
+        { status: 400 }
+      )
+    }
+
+    if (tokenRecord.usedByUserId) {
+      return NextResponse.json(
+        { error: 'Token ini sudah digunakan. Minta token baru dari admin.' },
         { status: 400 }
       )
     }
@@ -44,7 +71,15 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Do NOT auto-login — user must wait for admin approval
+    // Mark token as used
+    await db.registrationToken.update({
+      where: { id: tokenRecord.id },
+      data: {
+        usedByUserId: user.id,
+        usedAt: new Date(),
+      },
+    })
+
     return NextResponse.json({
       ok: true,
       message: 'Pendaftaran berhasil! Akun Anda menunggu persetujuan admin. Anda akan bisa login setelah admin men-approve akun Anda.',

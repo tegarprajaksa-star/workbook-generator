@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, Lock, Mail, Loader2, Sparkles, FileText, Download, Wand2, User, ArrowRight } from 'lucide-react'
+import { BookOpen, Lock, Mail, Loader2, Sparkles, FileText, Download, Wand2, User, ArrowRight, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +13,7 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [regToken, setRegToken] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -29,14 +30,14 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
       } else {
         const data = await api<{ ok: boolean; message: string }>('/auth/register', {
           method: 'POST',
-          body: JSON.stringify({ name, email, password }),
+          body: JSON.stringify({ name, email, password, registrationToken: regToken }),
         })
-        // Registration successful but NOT auto-login — user must wait for admin approval
         toast.success(data.message || 'Pendaftaran berhasil! Menunggu persetujuan admin.')
         setMode('login')
         setEmail('')
         setPassword('')
         setName('')
+        setRegToken('')
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : (mode === 'login' ? 'Login gagal' : 'Pendaftaran gagal'))
@@ -183,6 +184,27 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
                 />
               </div>
             </div>
+
+            {mode === 'signup' && (
+              <div className="space-y-2">
+                <Label htmlFor="token">Token Registrasi</Label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="token"
+                    type="text"
+                    placeholder="WB-XXXXXXXX"
+                    className="pl-10 font-mono"
+                    value={regToken}
+                    onChange={(e) => setRegToken(e.target.value)}
+                    required
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Token didapat dari admin. Tanpa token, pendaftaran tidak bisa dilakukan.
+                </p>
+              </div>
+            )}
 
             <Button type="submit" className="w-full h-11 text-base" disabled={loading}>
               {loading ? (
