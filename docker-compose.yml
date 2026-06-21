@@ -1,7 +1,5 @@
 # Docker Compose - untuk jalan 1 command di server
-# Aplikasi + Nginx (reverse proxy) + SSL otomatis
-
-version: '3.8'
+# Aplikasi + auto-restart + persistent database
 
 services:
   app:

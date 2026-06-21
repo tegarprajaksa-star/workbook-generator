@@ -1,12 +1,12 @@
 # Dockerfile untuk Workbook Generator
 # Bikin aplikasi siap deploy ke server manapun
 
-FROM oven/bun:1.1 AS base
+FROM oven/bun:latest AS base
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies (tanpa frozen-lockfile supaya kompatibel semua versi bun)
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy source code
 COPY . .
@@ -18,7 +18,7 @@ RUN bun run db:generate
 RUN bun run build
 
 # Production image - lebih kecil
-FROM oven/bun:1.1 AS runner
+FROM oven/bun:latest AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
