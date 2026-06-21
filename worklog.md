@@ -215,3 +215,25 @@ Stage Summary:
 - Export reliability restored: sharp-based rendering (no Playwright/browser dependency)
 - Font rendering fixed: DejaVu Sans + zero non-ASCII characters = clean text in all formats
 - All 3 exports (PPTX, DOCX, PDF) work fast and reliably with readable BPMN diagrams
+
+---
+Task ID: 10
+Agent: Orchestrator
+Task: Definitive fix for font boxes + PDF failure using @resvg/resvg-js
+
+Work Log:
+- Root cause of font boxes: sharp was compiled WITHOUT librsvg support (librsvg: NOT AVAILABLE), so it cannot render SVG text — produces boxes/squares
+- Root cause of PDF failure: same sharp issue caused DOCX generation to fail (no BPMN images), then LibreOffice conversion failed too
+- Solution: installed @resvg/resvg-js (pure Rust SVG renderer, no system dependencies, renders fonts perfectly with system font loading)
+- Fixed Next.js config: added serverExternalPackages: ["@resvg/resvg-js", "sharp"] — tells Turbopack to load these as native Node.js modules instead of trying to bundle them (which caused "could not resolve @resvg/resvg-js-linux-x64-gnu" error)
+- Rewrote src/lib/svg-render.ts to use Resvg instead of sharp:
+  - loadSystemFonts: true (loads DejaVu Sans and all system fonts)
+  - defaultFontFamily: 'DejaVu Sans'
+  - 2x scale for crisp text
+- VLM verified ALL 3 exports: DOCX, PPTX, PDF — all BPMN text fully readable (lane labels, task labels, SLA labels, YA/TIDAK branches, START/END, KOREKSI)
+
+Stage Summary:
+- Font rendering definitively fixed: @resvg/resvg-js renders text perfectly, no more boxes
+- All 3 exports work: DOCX (105KB/1.8s), PPTX (445KB/1.8s), PDF (215KB/2.6s)
+- No Playwright, no browser dependency, no librsvg needed — pure Rust library
+- serverExternalPackages config ensures native modules load correctly in Turbopack

@@ -1,32 +1,32 @@
-// SVG to PNG renderer using sharp (librsvg).
-// Uses DejaVu Sans font (installed on all Linux systems) for reliable text rendering.
-// All emoji/special characters should already be stripped from the SVG before rendering.
+// SVG to PNG renderer using @resvg/resvg-js (pure Rust, no system dependencies).
+// Renders text perfectly with system fonts — no garbled/box characters.
 
-import sharp from 'sharp'
+import { Resvg } from '@resvg/resvg-js'
 
 /**
- * Render an SVG string to a PNG buffer using sharp.
- * Reliable, fast, no browser dependency.
+ * Render an SVG string to a PNG buffer using resvg.
+ * Reliable, fast (~0.1s), renders fonts correctly.
  */
 export async function renderSvgToPng(
   svg: string,
   options: { scale?: number } = {}
 ): Promise<Buffer> {
   const scale = options.scale || 2
-  // Parse width/height from SVG
+
+  // Parse width/height from SVG for the fitTo calculation
   const widthMatch = svg.match(/width="(\d+)"/)
-  const heightMatch = svg.match(/height="(\d+)"/)
-  const w = widthMatch ? parseInt(widthMatch[1]) : 800
-  const h = heightMatch ? parseInt(heightMatch[1]) : 400
+  const targetWidth = widthMatch ? parseInt(widthMatch[1]) * scale : 1400
 
-  // Use high density for crisp text, then resize to target
-  const density = 144 * scale // 144 DPI base * scale
-  const pngBuffer = await sharp(Buffer.from(svg), { density })
-    .resize({ width: Math.round(w * scale), height: Math.round(h * scale), fit: 'fill' })
-    .png()
-    .toBuffer()
-
-  return pngBuffer
+  const resvg = new Resvg(svg, {
+    fitTo: { mode: 'width', value: targetWidth },
+    font: {
+      loadSystemFonts: true,
+      defaultFontFamily: 'DejaVu Sans',
+      family: 'DejaVu Sans',
+    },
+  })
+  const pngBuffer = resvg.render().asPng()
+  return Buffer.from(pngBuffer)
 }
 
 // Batch render multiple SVGs

@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: false,
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  serverExternalPackages: ["@resvg/resvg-js", "sharp"],
 };
 
 export default nextConfig;
