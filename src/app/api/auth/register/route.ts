@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { hashPassword, createSession, setSessionCookie } from '@/lib/auth'
+import { hashPassword } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,25 +32,28 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // New users are NOT approved — admin must approve before login
     const user = await db.user.create({
       data: {
         name: name.trim(),
         email: normalizedEmail,
         passwordHash: hashPassword(password),
         role: 'USER',
+        isApproved: false,
+        isBlocked: false,
       },
     })
 
-    const token = await createSession(user.id)
-    await setSessionCookie(token)
-
+    // Do NOT auto-login — user must wait for admin approval
     return NextResponse.json({
+      ok: true,
+      message: 'Pendaftaran berhasil! Akun Anda menunggu persetujuan admin. Anda akan bisa login setelah admin men-approve akun Anda.',
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
-        employeeId: null,
+        isApproved: false,
         isBlocked: false,
       },
     })

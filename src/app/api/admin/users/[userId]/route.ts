@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { isBlocked, role, name } = body
+    const { isBlocked, isApproved, role, name } = body
 
     // Prevent self-blocking / self-demotion
     if (userId === currentUser.id) {
@@ -25,6 +25,9 @@ export async function PATCH(req: NextRequest) {
       }
       if (role && role !== currentUser.role) {
         return NextResponse.json({ error: 'Tidak bisa mengubah role akun sendiri' }, { status: 400 })
+      }
+      if (isApproved === false) {
+        return NextResponse.json({ error: 'Tidak bisa menonaktifkan approval akun sendiri' }, { status: 400 })
       }
     }
 
@@ -49,17 +52,18 @@ export async function PATCH(req: NextRequest) {
 
     const data: Record<string, unknown> = {}
     if (typeof isBlocked === 'boolean') data.isBlocked = isBlocked
+    if (typeof isApproved === 'boolean') data.isApproved = isApproved
     if (role && ['USER', 'ADMIN'].includes(role)) data.role = role
     if (name) data.name = name.trim()
 
     const updated = await db.user.update({
       where: { id: userId },
       data,
-      select: { id: true, email: true, name: true, role: true, isBlocked: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isBlocked: true, isApproved: true, createdAt: true },
     })
 
-    // If blocking, invalidate all their sessions
-    if (isBlocked === true) {
+    // If blocking or un-approving, invalidate all their sessions
+    if (isBlocked === true || isApproved === false) {
       await db.session.deleteMany({ where: { userId } }).catch(() => {})
     }
 

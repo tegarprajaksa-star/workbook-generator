@@ -16,6 +16,7 @@ export async function GET() {
         name: true,
         role: true,
         isBlocked: true,
+        isApproved: true,
         createdAt: true,
         _count: { select: { workbooks: true, sessions: true } },
       },
@@ -58,14 +59,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email sudah terdaftar' }, { status: 409 })
     }
 
+    // Admin-created users are auto-approved
     const user = await db.user.create({
       data: {
         name: name.trim(),
         email: normalizedEmail,
         passwordHash: hashPassword(password),
         role: finalRole,
+        isApproved: true,
       },
-      select: { id: true, email: true, name: true, role: true, isBlocked: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isBlocked: true, isApproved: true, createdAt: true },
     })
 
     return NextResponse.json({ user })

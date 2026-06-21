@@ -22,6 +22,7 @@ model User {
   passwordHash String
   role         String    @default("USER") // MASTER_ADMIN | ADMIN | USER
   isBlocked    Boolean   @default(false) // blocked users cannot login
+  isApproved   Boolean   @default(false) // must be approved by admin before login
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

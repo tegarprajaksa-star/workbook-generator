@@ -6,6 +6,7 @@ export type SessionUser = {
   name: string
   role: string
   isBlocked?: boolean
+  isApproved?: boolean
 }
 
 export type Kra = { name: string; formula: string; target: string; unit: string }

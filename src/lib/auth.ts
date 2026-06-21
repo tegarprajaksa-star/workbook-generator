@@ -69,6 +69,7 @@ export type SessionUser = {
   role: string
   employeeId: string | null
   isBlocked: boolean
+  isApproved: boolean
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
@@ -86,8 +87,8 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     return null
   }
 
-  // If user is blocked, invalidate their session and deny access
-  if (session.user.isBlocked) {
+  // If user is blocked or not approved, invalidate their session and deny access
+  if (session.user.isBlocked || !session.user.isApproved) {
     await db.session.deleteMany({ where: { userId: session.user.id } }).catch(() => {})
     return null
   }
@@ -99,6 +100,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     role: session.user.role,
     employeeId: session.user.employeeId,
     isBlocked: session.user.isBlocked,
+    isApproved: session.user.isApproved,
   }
 }
 

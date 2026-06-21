@@ -19,6 +19,7 @@ export async function POST() {
         name: 'Master Admin',
         passwordHash: hashPassword('admin123'),
         role: 'MASTER_ADMIN',
+        isApproved: true,
       },
     })
 

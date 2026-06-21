@@ -27,12 +27,16 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
         toast.success(`Selamat datang, ${data.user.name}!`)
         onLogin(data.user)
       } else {
-        const data = await api<{ user: SessionUser }>('/auth/register', {
+        const data = await api<{ ok: boolean; message: string }>('/auth/register', {
           method: 'POST',
           body: JSON.stringify({ name, email, password }),
         })
-        toast.success(`Akun dibuat. Selamat datang, ${data.user.name}!`)
-        onLogin(data.user)
+        // Registration successful but NOT auto-login — user must wait for admin approval
+        toast.success(data.message || 'Pendaftaran berhasil! Menunggu persetujuan admin.')
+        setMode('login')
+        setEmail('')
+        setPassword('')
+        setName('')
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : (mode === 'login' ? 'Login gagal' : 'Pendaftaran gagal'))

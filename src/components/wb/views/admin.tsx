@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   Loader2, Users, Plus, Trash2, Ban, CheckCircle2, Shield, Crown,
-  Search, Mail, Calendar, MoreVertical, Pencil, ShieldCheck, ShieldX,
+  Search, Mail, Calendar, MoreVertical, Pencil, ShieldCheck, ShieldX, Clock, UserCheck,
 } from 'lucide-react'
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -33,6 +33,7 @@ type AdminUser = {
   name: string
   role: string
   isBlocked: boolean
+  isApproved: boolean
   createdAt: string
   _count: { workbooks: number; sessions: number }
 }
@@ -92,6 +93,33 @@ export function AdminView({ user }: { user: SessionUser }) {
     }
   }
 
+  async function approveUser(u: AdminUser) {
+    try {
+      await api(`/admin/users/${u.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isApproved: true }),
+      })
+      toast.success(`${u.name} telah di-approve. Sekarang bisa login.`)
+      load()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal approve')
+    }
+  }
+
+  async function revokeApproval(u: AdminUser) {
+    if (!confirm(`Cabut approval ${u.name}? User tidak akan bisa login lagi.`)) return
+    try {
+      await api(`/admin/users/${u.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isApproved: false }),
+      })
+      toast.success('Approval dicabut')
+      load()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal')
+    }
+  }
+
   async function changeRole(u: AdminUser, newRole: string) {
     try {
       await api(`/admin/users/${u.id}`, {
@@ -130,11 +158,13 @@ export function AdminView({ user }: { user: SessionUser }) {
   }
 
   const isMasterAdmin = user.role === 'MASTER_ADMIN'
+  const pendingUsers = users.filter(u => !u.isApproved && !u.isBlocked)
   const stats = {
     total: users.length,
     admins: users.filter(u => u.role !== 'USER').length,
     blocked: users.filter(u => u.isBlocked).length,
-    active: users.filter(u => !u.isBlocked).length,
+    pending: pendingUsers.length,
+    active: users.filter(u => u.isApproved && !u.isBlocked).length,
   }
 
   return (
@@ -167,14 +197,56 @@ export function AdminView({ user }: { user: SessionUser }) {
           <div className="text-xs text-muted-foreground">Aktif</div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
-          <div className="text-2xl font-bold text-amber-600">{stats.admins}</div>
-          <div className="text-xs text-muted-foreground">Admin</div>
+          <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
+          <div className="text-xs text-muted-foreground">Menunggu Approval</div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="text-2xl font-bold text-red-600">{stats.blocked}</div>
           <div className="text-xs text-muted-foreground">Diblokir</div>
         </CardContent></Card>
       </div>
+
+      {/* Pending Approval Section */}
+      {pendingUsers.length > 0 && (
+        <Card className="border-amber-300 bg-amber-50/50 dark:bg-amber-950/10">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2 text-amber-800 dark:text-amber-400">
+              <Clock className="w-5 h-5" />
+              Menunggu Persetujuan ({pendingUsers.length})
+            </CardTitle>
+            <CardDescription>User yang sudah daftar tapi belum bisa login. Approve untuk mengizinkan login.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {pendingUsers.map((u) => {
+                const initials = u.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
+                return (
+                  <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                    <Avatar className="w-10 h-10 flex-shrink-0">
+                      <AvatarFallback className="text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm">{u.name}</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Mail className="w-3 h-3" />{u.email}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground/70 mt-0.5">
+                        Daftar: {new Date(u.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                    <Button size="sm" onClick={() => approveUser(u)} className="bg-green-600 hover:bg-green-700">
+                      <UserCheck className="w-4 h-4 mr-1" />
+                      Approve
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search */}
       <div className="relative max-w-md">
@@ -215,6 +287,15 @@ export function AdminView({ user }: { user: SessionUser }) {
                           <cfg.icon className="w-3 h-3 mr-0.5" />
                           {cfg.label}
                         </Badge>
+                        {u.isApproved ? (
+                          <Badge variant="outline" className="text-[10px] text-green-600 bg-green-100 dark:bg-green-950/40 border-0">
+                            <CheckCircle2 className="w-3 h-3 mr-0.5" />Approved
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-amber-600 bg-amber-100 dark:bg-amber-950/40 border-0">
+                            <Clock className="w-3 h-3 mr-0.5" />Pending
+                          </Badge>
+                        )}
                         {u.isBlocked && (
                           <Badge variant="outline" className="text-[10px] text-red-600 bg-red-100 dark:bg-red-950/40 border-0">
                             <Ban className="w-3 h-3 mr-0.5" />Diblokir
@@ -228,6 +309,30 @@ export function AdminView({ user }: { user: SessionUser }) {
                       </div>
                     </div>
                     <div className="flex gap-1 flex-shrink-0">
+                      {/* Approve/Revoke */}
+                      {u.role !== 'MASTER_ADMIN' && !isSelf && (
+                        !u.isApproved ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => approveUser(u)}
+                            title="Approve user"
+                          >
+                            <UserCheck className="w-4 h-4 text-green-600" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => revokeApproval(u)}
+                            title="Cabut approval"
+                          >
+                            <Clock className="w-4 h-4 text-amber-600" />
+                          </Button>
+                        )
+                      )}
                       {/* Block/Unblock */}
                       {u.role !== 'MASTER_ADMIN' && !isSelf && (
                         <Button

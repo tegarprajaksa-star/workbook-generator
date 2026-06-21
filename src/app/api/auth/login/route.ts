@@ -33,6 +33,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Block login for unapproved accounts
+    if (!user.isApproved) {
+      return NextResponse.json(
+        { error: 'Akun Anda belum di-approve oleh admin. Mohon tunggu persetujuan.' },
+        { status: 403 }
+      )
+    }
+
     const token = await createSession(user.id)
     await setSessionCookie(token)
 
@@ -44,6 +52,7 @@ export async function POST(req: NextRequest) {
         role: user.role,
         employeeId: user.employeeId,
         isBlocked: user.isBlocked,
+        isApproved: user.isApproved,
       },
     })
   } catch (error) {
