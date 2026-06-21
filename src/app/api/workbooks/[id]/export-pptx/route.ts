@@ -183,7 +183,7 @@ export async function GET(
         // Generate BPMN diagram as PNG and embed
         try {
           const svg = generateBpmnSvg(lanes, steps as unknown as BpmnStepT[], wb.accentColor || '#b45309')
-          const pngBuffer = await sharp(Buffer.from(svg))
+          const pngBuffer = await sharp(Buffer.from(svg), { density: 192 })
             .resize({ width: 1800, fit: 'inside' })
             .png()
             .toBuffer()

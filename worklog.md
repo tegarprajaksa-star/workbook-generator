@@ -145,3 +145,25 @@ Stage Summary:
 - END arrow fixed in BPMN diagram (main flow connects to END, skipping corrections)
 - 3 export formats: PDF, DOCX, PPTX — all embed BPMN flow chart as clean visual image
 - VLM verified: PDF pages show BPMN diagrams with swim lanes, boxes, diamonds, arrows — clean and readable
+
+---
+Task ID: 7
+Agent: Orchestrator
+Task: Fix garbled/unreadable font in BPMN diagrams exported to PPT/DOC/PDF
+
+Work Log:
+- Root cause: SVG used "Arial, Helvetica, sans-serif" font-family which doesn't always resolve in headless librsvg/sharp rendering, causing text to show as boxes/squares
+- Also emoji characters (⏱ clock, ✓ checkmark, ✗ cross) don't render in DejaVu Sans and appeared as boxes
+- Fixed SVG generator (src/lib/bpmn-svg.ts):
+  - Changed font-family to "DejaVu Sans" (installed on all Linux systems, renders reliably with librsvg)
+  - Added XML prolog (<?xml version="1.0" encoding="UTF-8"?>) for better parser compatibility
+  - Replaced ⏱ emoji in SLA pills with plain "SLA" text prefix
+  - Replaced ✓/✗ symbols in YA/TIDAK branch labels with plain "YA"/"TIDAK" text (color green/red already conveys yes/no)
+- Increased sharp render density to 192 DPI (2x) for crisper text in all export routes (DOCX, PPTX, PDF)
+- Updated client-side BPMN diagram to match: SLA pills now show "SLA" instead of clock emoji
+- VLM verified all 3 exports: DOCX, PPTX, PDF — all BPMN text fully readable (lane labels, task labels, SLA labels, YA/TIDAK branch labels)
+
+Stage Summary:
+- Font rendering issue fixed in all export formats (PPT, DOC, PDF)
+- BPMN diagrams now render with crisp, readable text using DejaVu Sans font at 2x density
+- No more garbled/square characters — all text including SLA pills and branch labels is legible

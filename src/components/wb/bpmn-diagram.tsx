@@ -243,13 +243,13 @@ function renderShape(step: BpmnStep, accent: string, compact: boolean) {
 
 // Small SLA pill rendered outside shapes to avoid text overlap
 function SlaPill({ sla, y, compact }: { sla: string; y: number; compact: boolean }) {
-  const pw = compact ? 38 : 44
+  const pw = compact ? 42 : 48
   const ph = 14
   return (
     <g transform={`translate(0, ${y})`}>
       <rect x={-pw / 2} y={-ph / 2} width={pw} height={ph} rx={7} fill="#f5f5f4" stroke="#d6d3d1" strokeWidth={0.8} />
       <text x={0} y={1} textAnchor="middle" dominantBaseline="middle" fontSize={compact ? 7 : 8} fontWeight={700} fill="#57534e">
-        ⏱ {sla}
+        SLA {sla}
       </text>
     </g>
   )

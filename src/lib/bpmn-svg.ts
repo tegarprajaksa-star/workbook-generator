@@ -254,21 +254,25 @@ function renderShapeSvg(step: BpmnStep): string {
 }
 
 function renderSlaPillSvg(sla: string, y: number): string {
-  const pw = 44
+  const pw = 50
   const ph = 14
-  return `<g transform="translate(0, ${y})"><rect x="${-pw / 2}" y="${-ph / 2}" width="${pw}" height="${ph}" rx="7" fill="#f5f5f4" stroke="#d6d3d1" stroke-width="0.8"/><text x="0" y="1" text-anchor="middle" dominant-baseline="middle" font-size="8" font-weight="700" fill="#57534e">⏱ ${escapeXml(sla)}</text></g>`
+  // Use "SLA:" text prefix instead of clock emoji ⏱ which may not render in all font contexts
+  return `<g transform="translate(0, ${y})"><rect x="${-pw / 2}" y="${-ph / 2}" width="${pw}" height="${ph}" rx="7" fill="#f5f5f4" stroke="#d6d3d1" stroke-width="0.8"/><text x="0" y="1" text-anchor="middle" dominant-baseline="middle" font-size="8" font-weight="700" fill="#57534e">SLA ${escapeXml(sla)}</text></g>`
 }
 
 // Main entry: generate full SVG string for a BPMN diagram
 export function generateBpmnSvg(lanes: string[], steps: BpmnStep[], accentColor = '#b45309'): string {
   if (steps.length === 0 || lanes.length === 0) {
-    return '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60"><text x="100" y="30" text-anchor="middle" fill="#999" font-size="12">Belum ada langkah proses</text></svg>'
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60"><text x="100" y="30" text-anchor="middle" fill="#999" font-size="12" font-family="DejaVu Sans">Belum ada langkah proses</text></svg>'
   }
 
   const layout = computeLayout(lanes, steps)
   const { padX, padY, laneHeaderW, cellW, cellH, width, height, positions, arrows, colCount } = layout
 
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="Arial, Helvetica, sans-serif">`
+  // Use DejaVu Sans — installed on all Linux systems, renders reliably with librsvg/sharp.
+  // Avoid Arial/Helvetica which may not resolve in headless render contexts.
+  const FONT = 'DejaVu Sans'
+  let svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="${FONT}">`
 
   // Defs (arrow markers)
   svg += `<defs>`
@@ -294,8 +298,11 @@ export function generateBpmnSvg(lanes: string[], steps: BpmnStep[], accentColor 
     const marker = a.color === '#16a34a' ? 'url(#ah-green)' : a.color === '#dc2626' ? 'url(#ah-red)' : 'url(#ah-gray)'
     svg += `<path d="${a.path}" fill="none" stroke="${a.color}" stroke-width="1.6" marker-end="${marker}"/>`
     if (a.label) {
-      svg += `<rect x="${a.labelX - 20}" y="${a.labelY - 10}" width="40" height="20" rx="5" fill="#ffffff" stroke="${a.color}" stroke-width="1.5"/>`
-      svg += `<text x="${a.labelX}" y="${a.labelY + 1}" text-anchor="middle" dominant-baseline="middle" font-size="11" font-weight="800" fill="${a.color}">${a.label}</text>`
+      // Replace ✓/✗ symbols with plain text to avoid font/emoji rendering issues
+      // "✓ YA" → "YA", "✗ TIDAK" → "TIDAK" (color already conveys yes/no)
+      const labelText = a.label.replace('✓ ', '').replace('✗ ', '')
+      svg += `<rect x="${a.labelX - 24}" y="${a.labelY - 10}" width="48" height="20" rx="5" fill="#ffffff" stroke="${a.color}" stroke-width="1.5"/>`
+      svg += `<text x="${a.labelX}" y="${a.labelY + 1}" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="800" fill="${a.color}">${escapeXml(labelText)}</text>`
     }
   }
 

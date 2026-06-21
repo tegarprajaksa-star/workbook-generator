@@ -26,8 +26,9 @@ async function bpmnSvgToPng(lanes: string[], steps: Step[], accentColor: string)
   if (steps.length === 0 || lanes.length === 0) return null
   try {
     const svg = generateBpmnSvg(lanes, steps as unknown as BpmnStepT[], accentColor)
-    const pngBuffer = await sharp(Buffer.from(svg))
-      .resize({ width: 1400, fit: 'inside' })
+    // Render at 2x density for crisp text, then resize to target width
+    const pngBuffer = await sharp(Buffer.from(svg), { density: 192 })
+      .resize({ width: 1600, fit: 'inside' })
       .png()
       .toBuffer()
     return pngBuffer
