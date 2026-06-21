@@ -68,6 +68,7 @@ export type SessionUser = {
   name: string
   role: string
   employeeId: string | null
+  isBlocked: boolean
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
@@ -85,12 +86,19 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     return null
   }
 
+  // If user is blocked, invalidate their session and deny access
+  if (session.user.isBlocked) {
+    await db.session.deleteMany({ where: { userId: session.user.id } }).catch(() => {})
+    return null
+  }
+
   return {
     id: session.user.id,
     email: session.user.email,
     name: session.user.name,
     role: session.user.role,
     employeeId: session.user.employeeId,
+    isBlocked: session.user.isBlocked,
   }
 }
 
@@ -102,9 +110,19 @@ export async function requireAuth(): Promise<SessionUser> {
   return user
 }
 
+// ADMIN or MASTER_ADMIN
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireAuth()
-  if (user.role !== 'ADMIN') {
+  if (user.role !== 'ADMIN' && user.role !== 'MASTER_ADMIN') {
+    throw new Error('FORBIDDEN')
+  }
+  return user
+}
+
+// MASTER_ADMIN only
+export async function requireMasterAdmin(): Promise<SessionUser> {
+  const user = await requireAuth()
+  if (user.role !== 'MASTER_ADMIN') {
     throw new Error('FORBIDDEN')
   }
   return user

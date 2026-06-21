@@ -261,3 +261,104 @@ Stage Summary:
 - BPMN text now renders correctly: font files bundled in project, loaded explicitly via resvg fontFiles option
 - PDF export now reliable: proper profile isolation, kill conflicts, longer timeout
 - All 3 export formats verified working with readable BPMN diagrams
+
+---
+
+## Task ID: 12-verify
+
+**Task:** Verify 5 changes (no demo account, admin login/role, Admin Panel, signup role gating, vertical BPMN lane labels, no PDF export) with browser.
+
+**Tool used:** agent-browser (headless Chromium) + Next.js dev server on http://127.0.0.1:3000
+
+**Server startup:** `setsid -f bash -c 'cd /home/z/my-project && exec bun run dev > dev.log 2>&1'` (the simpler `setsid bash -c 'exec bun run dev'` form kept getting killed when the launching shell terminated; `setsid -f` properly detached the process).
+
+### Verification Results
+
+**1. No demo account on login page — PASS**
+- Loaded http://127.0.0.1:3000
+- Page innerText contains only: marketing copy, "Masuk ke Akun" heading, Masuk/Daftar toggle tabs, Email/Password fields, "Masuk" submit button, and "Belum punya akun? Daftar di sini" link.
+- No "demo" string anywhere on the page (grep on full a11y snapshot + body innerText returned nothing).
+- No demo credentials, no quick-login demo button.
+
+**2. Login as Master Admin — PASS**
+- Filled email `admin@workbookgen.app` / password `admin123`, clicked Masuk.
+- Sidebar shows the "Admin Panel — Kelola pengguna" menu item (visible only to ADMIN/MASTER_ADMIN roles; not shown to USER role — see check 4).
+- User badge in sidebar shows avatar "MA" with name "Master Admin" and email `admin@workbookgen.app`; role chip also reads "Master Admin".
+
+**3. Admin Panel — PASS**
+- Clicked Admin Panel in sidebar; URL stayed on `/` (single-page app shell) but content switched to Admin Panel.
+- Page shows stats: "2 Total User", "2 Aktif", "1 Admin", "0 Diblokir".
+- "Tambah User" button present (ref=e7).
+- Search input "Cari user..." present.
+- User list shows two cards: "Test User" (User, test@test.com, 0 workbook) and "Master Admin" (Anda, admin@workbookgen.app, 1 workbook). Master Admin is listed.
+- Per-user actions: Block toggle and Hapus button.
+
+**4. Test signup (new USER role) — PASS**
+- Logged out (used JS click on the Keluar button — the agent-browser `click @ref` on this particular sidebar button did not fire reliably, likely because HMR fast-refresh happened between snapshot and click; the underlying `button.click()` via `agent-browser eval` worked and the page showed the "Berhasil logout" toast).
+- Switched to the Daftar tab, registered "John Test" / `john@test.com` / `john123`.
+- POST /api/auth/register returned 200; new session created.
+- After signup the user lands on `/` dashboard; sidebar shows only "Workbook Saya", "Buat Baru", "Keluar" — NO "Admin Panel" item, confirming role-based menu gating works for USER role.
+- User badge shows "JT" / "John Test" / `john@test.com` / role "User".
+
+**5. BPMN lane labels vertical — PASS**
+- Logged back in as Master Admin, opened the "Buku Kerja Karyawan Barista" (Kinikawa Coffee / Barista) workbook — it goes straight to the Preview & Export page.
+- Scrolled to the "Alur Proses (BPMN 2.0)" sections. Two BPMN SVG diagrams present (1576×490 px each).
+- Inspected SVG `<text>` transforms via `agent-browser eval`:
+  - Diagram 1 (P01 — Opening Outlet): lane labels "Barista", "Supervisor / Shift Le…", "Inventory / Storage" all have `transform="rotate(-90 48 95)"`, `rotate(-90 48 245)`, `rotate(-90 48 395)` respectively.
+  - Diagram 2 (P02 — Order Taking & Payment): lane labels "Customer", "Barista / Cashier", "POS / Payment" all have `transform="rotate(-90 48 …)"`.
+- `rotate(-90)` rotates text 90° counter-clockwise, so lane labels read bottom-to-top along the left lane gutter — i.e. vertical, as required.
+- Screenshot saved to `/tmp/bpmn_lanes_vertical.png`.
+
+**6. No PDF export button — PASS**
+- On the Preview page, enumerated all export-related buttons via `agent-browser eval`:
+  - Top of page: "DOCX", "Export PPT"
+  - Bottom of page (signature section): "DOCX", "PPTX"
+- Total of 4 export buttons across two locations, all of them DOCX or PPTX. **No PDF button anywhere.**
+
+### Console errors
+- `agent-browser errors` returned empty.
+- Console log only contains the usual `[HMR] connected`, `[Fast Refresh] rebuilding/done` info messages, plus the React DevTools download suggestion. No runtime errors, no unhandled promise rejections, no failed network requests.
+
+### Notes / observations (non-blocking)
+- The agent-browser `click @<ref>` command was unreliable for the sidebar "Keluar" (logout) button in this session — likely because HMR Fast Refresh events fired between snapshot and click, invalidating the ref. Workaround was `agent-browser eval` with `document.querySelectorAll('button').forEach(b => b.textContent.includes('Keluar') && b.click())`. Worth noting for future verifications but not a bug in the app itself.
+- The dev server (`bun run dev`) had to be started with `setsid -f` for full detachment; without `-f`, the Next.js process was being reaped when the launching bash session terminated, causing `ERR_CONNECTION_REFUSED` on the next browser open.
+
+### Final summary
+All 6 checks PASS. The 5 changes (no demo account, role-gated Admin Panel menu, Admin Panel page, USER-role signup gating, vertical BPMN lane labels) plus the bonus "no PDF export button" check are all verified working. No console errors observed.
+
+---
+Task ID: 12
+Agent: Orchestrator
+Task: 5 user requests — remove PDF, vertical lane labels, remove demo, admin panel, 3 roles
+
+Work Log:
+1. Removed PDF export: deleted export-pdf route, removed PDF buttons from preview UI (top + bottom bar), only DOCX + PPTX remain
+2. Vertical lane labels: added transform="rotate(-90 cx cy)" to lane label text in both server SVG (bpmn-svg.ts) and client component (bpmn-diagram.tsx) — labels now read bottom-to-top
+3. Removed demo account: deleted fillDemo() function, removed demo shortcut section from login screen, updated seed to create MASTER_ADMIN account instead (admin@workbookgen.app / admin123)
+4. Admin panel: 
+   - Added isBlocked field to User schema
+   - Updated auth: getCurrentUser checks isBlocked, login rejects blocked users, requireAdmin/requireMasterAdmin helpers
+   - Created /api/admin/users (GET list, POST create) and /api/admin/users/[userId] (PATCH block/unblock/role, DELETE)
+   - Created AdminView component: stats, user list with block/unblock/delete/role-change, create user dialog
+   - Integrated into app shell: "Admin Panel" nav item visible only for ADMIN + MASTER_ADMIN roles
+5. Three roles: MASTER_ADMIN (full access), ADMIN (manage users), USER (workbook only)
+   - MASTER_ADMIN can: create ADMIN accounts, change roles, delete ADMIN+USER accounts
+   - ADMIN can: create USER accounts, block/unblock USER accounts, delete USER accounts
+   - USER: no admin panel access (API returns 403 "Akses ditolak")
+6. Self-protection: cannot block/delete/change own role
+
+Verification (by subagent):
+- Login page has NO demo reference (grep returned 0 matches)
+- Master Admin login works, sidebar shows Admin Panel, badge shows "Master Admin"
+- Admin panel shows user list with stats, Tambah User button
+- New USER signup: no Admin Panel in sidebar, badge shows "User"
+- BPMN lane labels: rotate(-90) transform confirmed via eval — vertical
+- No PDF button: only DOCX + PPTX buttons confirmed via eval
+- Zero console errors
+
+Stage Summary:
+- PDF export removed entirely
+- BPMN lane labels now vertical (rotated -90°)
+- No demo account — users must register (MASTER_ADMIN: admin@workbookgen.app / admin123)
+- Full admin panel with user management (block/unblock/add/delete/role change)
+- 3-tier role system: MASTER_ADMIN > ADMIN > USER with proper access control

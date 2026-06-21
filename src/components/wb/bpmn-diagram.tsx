@@ -80,8 +80,9 @@ export function BpmnDiagram({ lanes, steps, accentColor = '#b45309', compact = f
                 fontSize={compact ? 9 : 11}
                 fontWeight={600}
                 fill="#44403c"
+                transform={`rotate(-90 ${padX + laneHeaderW / 2} ${y + cellH / 2})`}
               >
-                {truncate(lane, compact ? 14 : 18)}
+                {truncate(lane, compact ? 18 : 22)}
               </text>
               <line
                 x1={padX + laneHeaderW}

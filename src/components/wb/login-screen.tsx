@@ -41,12 +41,6 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
     }
   }
 
-  function fillDemo() {
-    setMode('login')
-    setEmail('demo@workbookgen.app')
-    setPassword('demo123')
-  }
-
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left: Brand panel */}
@@ -226,19 +220,7 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
             )}
           </p>
 
-          {/* Demo account shortcut */}
-          <div className="mt-6 pt-6 border-t">
-            <button
-              onClick={fillDemo}
-              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
-            >
-              Klik untuk isi akun demo otomatis
-            </button>
-            <p className="text-center text-xs text-muted-foreground mt-2">
-              demo@workbookgen.app · demo123
-            </p>
-          </div>
-
+          {/* No demo account — users must register */}
           <p className="text-center text-xs text-muted-foreground mt-6">
             © 2025 Workbook Generator
           </p>

@@ -286,7 +286,10 @@ export function generateBpmnSvg(lanes: string[], steps: BpmnStep[], accentColor 
     const y = padY + i * cellH
     svg += `<rect x="${padX + laneHeaderW}" y="${y}" width="${colCount * cellW}" height="${cellH}" fill="${i % 2 === 0 ? '#fafaf9' : '#ffffff'}" stroke="#e7e5e4" stroke-width="1"/>`
     svg += `<rect x="${padX}" y="${y}" width="${laneHeaderW}" height="${cellH}" fill="${accentColor}" opacity="0.13"/>`
-    svg += `<text x="${padX + laneHeaderW / 2}" y="${y + cellH / 2}" text-anchor="middle" dominant-baseline="middle" font-size="11" font-weight="600" fill="#44403c">${escapeXml(truncate(lanes[i], 18))}</text>`
+    // Vertical rotated lane label (rotated -90 degrees, reads bottom-to-top)
+    const labelX = padX + laneHeaderW / 2
+    const labelY = y + cellH / 2
+    svg += `<text x="${labelX}" y="${labelY}" text-anchor="middle" dominant-baseline="middle" font-size="11" font-weight="600" fill="#44403c" transform="rotate(-90 ${labelX} ${labelY})">${escapeXml(truncate(lanes[i], 22))}</text>`
     svg += `<line x1="${padX + laneHeaderW}" y1="${y}" x2="${padX + laneHeaderW}" y2="${y + cellH}" stroke="${accentColor}" stroke-width="1.5" opacity="0.4"/>`
   }
 

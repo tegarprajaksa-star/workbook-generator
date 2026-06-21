@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, LogOut, Menu, ChevronRight, Library, PlusCircle, FileText } from 'lucide-react'
+import { BookOpen, LogOut, Menu, ChevronRight, Library, PlusCircle, FileText, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -12,8 +12,9 @@ import { api, type SessionUser, type Workbook } from '@/lib/bpm-types'
 import { LibraryView } from '@/components/wb/views/library'
 import { BuilderView } from '@/components/wb/views/builder'
 import { PreviewView } from '@/components/wb/views/preview'
+import { AdminView } from '@/components/wb/views/admin'
 
-type ViewKey = 'library' | 'builder' | 'preview'
+type ViewKey = 'library' | 'builder' | 'preview' | 'admin'
 
 export function AppShell({ user, onLogout }: { user: SessionUser; onLogout: () => void }) {
   const [view, setView] = useState<ViewKey>('library')
@@ -55,7 +56,10 @@ export function AppShell({ user, onLogout }: { user: SessionUser; onLogout: () =
     library: 'Workbook Saya',
     builder: activeWorkbook ? 'Edit Workbook' : 'Buat Workbook Baru',
     preview: 'Preview & Export',
+    admin: 'Admin Panel',
   }
+
+  const isAdmin = user.role === 'ADMIN' || user.role === 'MASTER_ADMIN'
 
   const SidebarContent = (
     <div className="flex flex-col h-full">
@@ -101,6 +105,25 @@ export function AppShell({ user, onLogout }: { user: SessionUser; onLogout: () =
           </div>
         </button>
 
+        {isAdmin && (
+          <button
+            onClick={() => { setView('admin'); setMobileOpen(false) }}
+            className={cn(
+              'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all',
+              view === 'admin'
+                ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
+                : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            )}
+          >
+            <Shield className="w-4.5 h-4.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">Admin Panel</div>
+              <div className="text-[11px] truncate text-sidebar-foreground/40">Kelola pengguna</div>
+            </div>
+            {view === 'admin' && <ChevronRight className="w-4 h-4" />}
+          </button>
+        )}
+
         {activeWorkbook && view !== 'library' && (
           <button
             onClick={() => setView('preview')}
@@ -134,7 +157,7 @@ export function AppShell({ user, onLogout }: { user: SessionUser; onLogout: () =
         </div>
         <div className="flex items-center justify-between mt-2 px-2">
           <Badge variant="outline" className="text-[10px] border-sidebar-foreground/30 text-sidebar-foreground/70">
-            {user.role === 'ADMIN' ? 'Admin' : 'User'}
+            {user.role === 'MASTER_ADMIN' ? 'Master Admin' : user.role === 'ADMIN' ? 'Admin' : 'User'}
           </Badge>
           <Button
             variant="ghost"
@@ -208,6 +231,9 @@ export function AppShell({ user, onLogout }: { user: SessionUser; onLogout: () =
             )}
             {view === 'preview' && activeWorkbook && (
               <PreviewView workbook={activeWorkbook} onBack={backToLibrary} onEdit={() => openBuilder(activeWorkbook)} />
+            )}
+            {view === 'admin' && isAdmin && (
+              <AdminView user={user} />
             )}
           </div>
         </main>

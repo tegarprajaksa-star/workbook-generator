@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
         name: user.name,
         role: user.role,
         employeeId: null,
+        isBlocked: false,
       },
     })
   } catch (error) {

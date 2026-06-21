@@ -25,6 +25,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Block login for blocked accounts
+    if (user.isBlocked) {
+      return NextResponse.json(
+        { error: 'Akun Anda diblokir. Hubungi administrator.' },
+        { status: 403 }
+      )
+    }
+
     const token = await createSession(user.id)
     await setSessionCookie(token)
 
@@ -35,6 +43,7 @@ export async function POST(req: NextRequest) {
         name: user.name,
         role: user.role,
         employeeId: user.employeeId,
+        isBlocked: user.isBlocked,
       },
     })
   } catch (error) {

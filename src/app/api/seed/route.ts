@@ -12,12 +12,13 @@ export async function POST() {
       return NextResponse.json({ ok: true, seeded: false, message: 'Sudah ter-seed' })
     }
 
+    // Create MASTER_ADMIN account (owner of the platform)
     const user = await db.user.create({
       data: {
-        email: 'demo@workbookgen.app',
-        name: 'Demo User',
-        passwordHash: hashPassword('demo123'),
-        role: 'USER',
+        email: 'admin@workbookgen.app',
+        name: 'Master Admin',
+        passwordHash: hashPassword('admin123'),
+        role: 'MASTER_ADMIN',
       },
     })
 
@@ -154,7 +155,7 @@ export async function POST() {
     return NextResponse.json({
       ok: true,
       seeded: true,
-      credentials: { email: 'demo@workbookgen.app', password: 'demo123' },
+      credentials: { email: 'admin@workbookgen.app', password: 'admin123', role: 'MASTER_ADMIN' },
     })
   } catch (error) {
     console.error('Seed error:', error)
