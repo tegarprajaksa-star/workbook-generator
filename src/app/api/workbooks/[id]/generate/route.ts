@@ -4,40 +4,50 @@ import { getCurrentUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
-// AI-powered workbook generation using Google Gemini (FREE tier: 1500 requests/day)
-// Requires GEMINI_API_KEY environment variable
+// AI-powered workbook generation using Groq (FREE, fast, supports all regions)
+// Model: Llama 3.3 70B — free tier, 30 req/min, 14400 req/day
+// Requires GROQ_API_KEY environment variable
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+const GROQ_API_KEY = process.env.GROQ_API_KEY || ''
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const GROQ_MODEL = 'llama-3.3-70b-versatile'
 
-async function callGemini(prompt: string): Promise<string> {
-  if (!GEMINI_API_KEY) {
+async function callAI(prompt: string): Promise<string> {
+  if (!GROQ_API_KEY) {
     throw new Error('AI belum dikonfigurasi. Hubungi administrator untuk set API key.')
   }
 
-  const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+  const response = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${GROQ_API_KEY}`,
+    },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-      },
+      model: GROQ_MODEL,
+      messages: [
+        { role: 'system', content: 'Anda adalah konsultan HR & BPMN ahli. Selalu kembalikan JSON valid saja, tanpa markdown atau teks lain.' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 8000,
     }),
   })
 
   if (!response.ok) {
     const errText = await response.text()
-    console.error('Gemini API error:', response.status, errText)
+    console.error('Groq API error:', response.status, errText)
     if (response.status === 429) {
       throw new Error('Limit AI tercapai. Coba lagi beberapa menit lagi.')
+    }
+    if (response.status === 401) {
+      throw new Error('API key tidak valid. Hubungi administrator.')
     }
     throw new Error('AI error: ' + response.status)
   }
 
   const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const text = data.choices?.[0]?.message?.content || ''
   if (!text) throw new Error('AI tidak memberikan respons. Coba lagi.')
   return text
 }
@@ -92,7 +102,7 @@ Kembalikan HANYA JSON valid (tanpa markdown, tanpa penjelasan) dengan struktur:
   "responsibilities": "5 butir tanggung jawab, dipisah newline (\\n)"
 }`
 
-      const content = await callGemini(prompt)
+      const content = await callAI(prompt)
       const parsed = extractJSON(content) as Record<string, string>
       return NextResponse.json({ section: 'jobdesc', data: parsed })
     }
@@ -108,7 +118,7 @@ Kembalikan HANYA JSON valid:
   "dutiesMonthly": "tugas bulanan 1 kalimat"
 }`
 
-      const content = await callGemini(prompt)
+      const content = await callAI(prompt)
       const parsed = extractJSON(content) as Record<string, string>
       return NextResponse.json({ section: 'duties', data: parsed })
     }
@@ -122,7 +132,7 @@ Kembalikan HANYA JSON valid (array):
   { "name": "...", "formula": "...", "target": "...", "unit": "%" }
 ]`
 
-      const content = await callGemini(prompt)
+      const content = await callAI(prompt)
       const parsed = extractJSON(content) as Array<{ name: string; formula: string; target: string; unit: string }>
       return NextResponse.json({ section: 'kra', data: parsed })
     }
@@ -160,7 +170,7 @@ Kembalikan HANYA JSON valid (array of proses):
   }
 ]`
 
-      const content = await callGemini(prompt)
+      const content = await callAI(prompt)
       const parsed = extractJSON(content) as Array<Record<string, unknown>>
 
       // Save processes to DB
@@ -222,7 +232,7 @@ Kembalikan HANYA JSON valid (tanpa markdown) dengan struktur:
 
 Buat 4-6 proses. Setiap gateway WAJIB dua arah. SOP 5-7 langkah per proses.`
 
-    const content = await callGemini(prompt)
+    const content = await callAI(prompt)
     const parsed = extractJSON(content) as Record<string, unknown>
 
     // Save everything to DB
