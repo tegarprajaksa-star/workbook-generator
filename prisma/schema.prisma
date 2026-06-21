@@ -1,5 +1,6 @@
-// Prisma schema for Business Process Management (BPM) Application
-// Based on Kinikawa Coffee Barista Workbook
+// Prisma schema for Workbook / Business Process Generator
+// Users create workbooks (employee manuals) for ANY position, aided by AI,
+// then export to PPTX or DOCX.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,7 +12,7 @@ datasource db {
 }
 
 // ============================================================
-// AUTHENTICATION & USERS
+// AUTHENTICATION
 // ============================================================
 
 model User {
@@ -19,15 +20,12 @@ model User {
   email        String    @unique
   name         String
   passwordHash String
-  role         String    @default("STAFF") // ADMIN | MANAGER | STAFF
-  employeeId   String?   @unique
-  employee     Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  role         String    @default("USER") // ADMIN | USER
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  sessions Session[]
-  tasks    Task[]      @relation("TaskCreatedBy")
-  logs     TaskLog[]
+  sessions  Session[]
+  workbooks Workbook[]
 }
 
 model Session {
@@ -42,204 +40,56 @@ model Session {
 }
 
 // ============================================================
-// ORGANIZATION: DEPARTMENTS, POSITIONS, EMPLOYEES
+// WORKBOOK — one complete employee manual for one position
 // ============================================================
 
-model Department {
-  id          String     @id @default(cuid())
+model Workbook {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String // e.g. "Buku Kerja Karyawan Barista"
+  companyName     String   @default("")
+  companyTagline  String   @default("")
+  positionTitle   String // e.g. "Barista"
+  department      String   @default("")
+  reportsTo       String   @default("")
+  subordinates    String   @default("")
+  purpose         String   @default("") // Tujuan Jabatan
+  authority       String   @default("") // Wewenang (newline-separated)
+  responsibilities String  @default("") // Tanggung Jawab (newline-separated)
+  dutiesPrimary   String   @default("")
+  dutiesDaily     String   @default("")
+  dutiesWeekly    String   @default("")
+  dutiesMonthly   String   @default("")
+  krasJson        String   @default("[]") // JSON array
+  status          String   @default("DRAFT") // DRAFT | PUBLISHED
+  accentColor     String   @default("#b45309")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  processes WorkbookProcess[]
+
+  @@index([userId])
+}
+
+model WorkbookProcess {
+  id          String   @id @default(cuid())
+  workbookId  String
+  workbook    Workbook @relation(fields: [workbookId], references: [id], onDelete: Cascade)
+  code        String // P01, P02...
   name        String
-  description String?
-  positions   Position[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-}
+  description String   @default("")
+  inputText   String   @default("")
+  outputText  String   @default("")
+  totalSla    String   @default("")
+  category    String   @default("")
+  lanesJson   String   @default("[]") // JSON array of lane names
+  stepsJson   String   @default("[]") // JSON array of step objects
+  sopsJson    String   @default("[]") // JSON array of SOP objects
+  formsJson   String   @default("[]") // JSON array of form field objects
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-model Position {
-  id              String      @id @default(cuid())
-  title           String
-  departmentId    String
-  department      Department  @relation(fields: [departmentId], references: [id])
-  reportsToId     String? // self-reference for hierarchy
-  reportsTo       Position?   @relation("PositionHierarchy", fields: [reportsToId], references: [id])
-  subordinates    Position[]  @relation("PositionHierarchy")
-  purpose         String? // Tujuan Jabatan
-  authority       String? // Wewenang - one per line
-  responsibilities String? // Tanggung Jawab - one per line
-  dutiesPrimary   String? // Tugas Pokok
-  dutiesDaily     String? // Tugas Harian
-  dutiesWeekly    String? // Tugas Mingguan
-  dutiesMonthly   String? // Tugas Bulanan
-  employees       Employee[]
-  kras            Kra[]
-  processSteps    ProcessStep[]
-  color           String? // for UI badge color
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-}
-
-model Employee {
-  id         String    @id @default(cuid())
-  name       String
-  email      String    @unique
-  phone      String?
-  positionId String
-  position   Position  @relation(fields: [positionId], references: [id])
-  status     String    @default("ACTIVE") // ACTIVE | ON_LEAVE | INACTIVE
-  hireDate   DateTime  @default(now())
-  avatar     String?
-  user       User?
-  tasks      Task[]
-  logs       TaskLog[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  @@index([positionId])
-}
-
-// ============================================================
-// BUSINESS PROCESSES (BPMN 2.0)
-// ============================================================
-
-model Process {
-  id          String         @id @default(cuid())
-  code        String         @unique // P01, P02, ...
-  name        String
-  description String?
-  inputText   String? // Pemicu / Input
-  outputText  String? // Output Utama
-  totalSla    String? // e.g. "± 38 menit"
-  status      String         @default("ACTIVE") // ACTIVE | DRAFT | ARCHIVED
-  category    String? // e.g. "Operations", "Service"
-  lanes       ProcessLane[]
-  steps       ProcessStep[]
-  sops        SopStep[]
-  forms       FormTemplate[]
-  tasks       Task[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-}
-
-model ProcessLane {
-  id        String        @id @default(cuid())
-  processId String
-  process   Process       @relation(fields: [processId], references: [id], onDelete: Cascade)
-  name      String // e.g. "Barista", "Supervisor", "Customer"
-  order     Int
-  steps     ProcessStep[]
-
-  @@index([processId])
-}
-
-model ProcessStep {
-  id            String       @id @default(cuid())
-  processId     String
-  process       Process      @relation(fields: [processId], references: [id], onDelete: Cascade)
-  laneId        String
-  lane          ProcessLane  @relation(fields: [laneId], references: [id], onDelete: Cascade)
-  type          String // START | TASK | GATEWAY | END | CORRECTION
-  label         String
-  sla           String? // e.g. "3 mnt", "30 dtk"
-  order         Int
-  branchLabel   String? // "YA" or "TIDAK" for gateway branches
-  // For gateway steps: which step follows on YES and NO
-  yesTargetOrder  Int? // order of the step to go to if YES
-  noTargetOrder   Int? // order of the step to go to if NO
-  description   String?
-  positionId   String? // which role is responsible
-  position     Position? @relation(fields: [positionId], references: [id], onDelete: SetNull)
-  createdAt     DateTime     @default(now())
-
-  @@index([processId])
-  @@index([laneId])
-}
-
-model SopStep {
-  id             String   @id @default(cuid())
-  processId      String
-  process        Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
-  order          Int
-  instruction    String // SOP / Urutan Kerja
-  workInstruction String // WI / Penjabaran Teknis Detail
-  output         String // Output / Bukti
-  createdAt      DateTime @default(now())
-
-  @@index([processId])
-}
-
-// ============================================================
-// FORMS / TEMPLATES
-// ============================================================
-
-model FormTemplate {
-  id         String   @id @default(cuid())
-  processId  String?
-  process    Process? @relation(fields: [processId], references: [id], onDelete: SetNull)
-  name       String
-  description String?
-  fieldsJson String // JSON array of field definitions
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-}
-
-// ============================================================
-// KRA (Key Result Areas) / KPI
-// ============================================================
-
-model Kra {
-  id         String    @id @default(cuid())
-  positionId String
-  position   Position  @relation(fields: [positionId], references: [id], onDelete: Cascade)
-  name       String
-  formula    String // Formula / Cara Ukur
-  target     String // Target
-  unit       String? // %, menit, etc.
-  order      Int
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  @@index([positionId])
-}
-
-// ============================================================
-// TASKS / WORKFLOW INSTANCES (Autopilot)
-// ============================================================
-
-model Task {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  processId   String?
-  process     Process?  @relation(fields: [processId], references: [id], onDelete: SetNull)
-  processStepId String? // links to a specific ProcessStep
-  assignedToId String?
-  assignedTo  Employee? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  positionId  String? // role required (if no specific employee)
-  status      String    @default("PENDING") // PENDING | IN_PROGRESS | DONE | BLOCKED | CANCELLED
-  priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
-  dueDate     DateTime?
-  dataJson    String? // JSON payload for form data
-  createdById String
-  createdBy   User      @relation("TaskCreatedBy", fields: [createdById], references: [id])
-  logs        TaskLog[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([assignedToId])
-  @@index([status])
-  @@index([processId])
-}
-
-model TaskLog {
-  id         String    @id @default(cuid())
-  taskId     String
-  task       Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId     String?
-  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  employeeId String?
-  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  action     String // CREATED | ASSIGNED | STARTED | COMPLETED | BLOCKED | COMMENTED | REASSIGNED
-  note       String?
-  createdAt  DateTime  @default(now())
-
-  @@index([taskId])
+  @@index([workbookId])
 }

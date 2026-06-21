@@ -15,10 +15,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kinikawa BPM — Business Process Management",
-  description: "Sistem manajemen proses bisnis untuk operasional outlet. Cegah tumpang tindih peran, jalankan bisnis dengan autopilot.",
-  keywords: ["BPM", "Business Process", "Kinikawa", "SOP", "Workflow", "Autopilot"],
-  authors: [{ name: "Kinikawa Coffee" }],
+  title: "Workbook Generator — Buat Buku Panduan Kerja Otomatis",
+  description: "Generator buku panduan kerja & business process untuk posisi apapun. Isi dipandu, generate dengan AI, export ke PPT atau DOC.",
+  keywords: ["workbook generator", "buku panduan", "business process", "SOP", "BPMN", "job description"],
+  authors: [{ name: "Workbook Generator" }],
   icons: {
     icon: "/logo.svg",
   },

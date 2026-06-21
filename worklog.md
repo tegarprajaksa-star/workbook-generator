@@ -41,3 +41,27 @@ Stage Summary:
 - Complete BPM application with login (exclusive access), 6 business processes from PDF, role overlap prevention, autopilot workflow automation, and KRA tracking
 - Demo credentials: owner@kinikawa.test / kinikawa123 (Admin), supervisor@kinikawa.test / kinikawa123 (Manager), barista@kinikawa.test / kinikawa123 (Staff)
 - All 26 pages of the Barista Workbook digitized into an interactive BPM system
+
+---
+Task ID: 2
+Agent: Orchestrator
+Task: Rebuild as Workbook/Manual Generator with AI + PPTX/DOCX export
+
+Work Log:
+- Installed docx@9.7.1 and pptxgenjs@4.0.1 for server-side export
+- Redesigned Prisma schema: Workbook + WorkbookProcess models (JSON fields for lanes/steps/sops/forms/kras)
+- Built 8 API routes: auth (login/logout/me), seed, workbooks CRUD, workbooks/[id]/generate (AI), export-docx, export-pptx
+- AI generation uses z-ai-web-dev-sdk LLM with 4 modes: full workbook, jobdesc, duties, kra, processes
+- DOCX export: cover page, job desc table, authority/responsibilities, duties, KRA table, per-process BPMN steps table + SOP table (docx-js)
+- PPTX export: cover slide + job desc + authority/resp + duties + KRA + per-process (overview + BPMN table + SOP table) + closing slide (pptxgenjs, 16:9)
+- Rebuilt frontend: neutral warm professional theme, login screen, library view (grid of workbooks), builder wizard (5 steps with AI generate buttons), preview view (rendered workbook with export bar)
+- Seeded sample workbook (Kinikawa Barista with 2 processes) + tested AI generation with "Apoteker" → generated 4 processes, 5 KRAs, full job desc
+- Fixed PPTX color bug (pptxgenjs expects hex strings not RGB arrays)
+- ESLint: 0 errors
+- Agent Browser verified: login, library, create, AI generate, preview, export all work with no console errors
+- Both DOCX and PPTX exports produce valid files (verified with `file` command)
+
+Stage Summary:
+- Complete Workbook Generator SaaS: user fills position+company → AI generates full buku panduan (job desc, authority, responsibilities, duties, KRA, 4-6 BPMN processes with SOP/WI) → preview → export to PPTX or DOCX
+- Works for ANY position (tested: Barista, Apoteker)
+- Demo: demo@workbookgen.app / demo123

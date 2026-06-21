@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
-import { LoginScreen } from '@/components/bpm/login-screen'
-import { AppShell } from '@/components/bpm/app-shell'
+import { LoginScreen } from '@/components/wb/login-screen'
+import { AppShell } from '@/components/wb/app-shell'
 import { api, type SessionUser } from '@/lib/bpm-types'
 
 export default function Home() {
@@ -30,7 +30,7 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Memuat Kinikawa BPM...</p>
+          <p className="text-sm text-muted-foreground">Memuat Workbook Generator...</p>
         </div>
       </div>
     )
