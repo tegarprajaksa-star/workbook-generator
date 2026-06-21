@@ -145,15 +145,12 @@ export function ProcessEditor({ workbookId, accentColor, onGenerating, reloadKey
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <div>
           <p className="text-sm text-muted-foreground">
-            {processes.length} proses bisnis. Edit manual atau generate dengan AI.
+            {processes.length} proses bisnis. Buat proses baru secara manual.
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleGenerateAI}>
-            <Sparkles className="w-4 h-4 mr-1" /> Generate AI
-          </Button>
           <Button size="sm" onClick={openNewProcess} style={{ backgroundColor: accentColor }}>
-            <Plus className="w-4 h-4 mr-1" /> Tambah Manual
+            <Plus className="w-4 h-4 mr-1" /> Tambah Proses
           </Button>
         </div>
       </div>
@@ -164,11 +161,8 @@ export function ProcessEditor({ workbookId, accentColor, onGenerating, reloadKey
           <Workflow className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
           <p className="text-sm text-muted-foreground mb-3">Belum ada proses bisnis</p>
           <div className="flex gap-2 justify-center">
-            <Button variant="outline" size="sm" onClick={handleGenerateAI}>
-              <Sparkles className="w-4 h-4 mr-1" /> Generate dengan AI
-            </Button>
             <Button size="sm" onClick={openNewProcess} style={{ backgroundColor: accentColor }}>
-              <Plus className="w-4 h-4 mr-1" /> Buat Manual
+              <Plus className="w-4 h-4 mr-1" /> Buat Proses Baru
             </Button>
           </div>
         </div>

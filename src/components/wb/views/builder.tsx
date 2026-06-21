@@ -190,38 +190,19 @@ export function BuilderView({
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      {/* AI Quick Generate banner */}
-      <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
-        <CardContent className="p-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold">Generate Seluruh Workbook dengan AI</h3>
-                <p className="text-sm text-muted-foreground">
-                  Cukup isi posisi & perusahaan di langkah 1, lalu klik tombol ini.
-                  AI akan mengisi Job Desc, Tugas, KRA, dan seluruh proses bisnis.
-                </p>
-              </div>
+      {/* Manual input info banner */}
+      <Card className="border-primary/20 bg-muted/30">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Pencil className="w-4 h-4 text-primary" />
             </div>
-            <Button
-              onClick={() => generate('full', {
-                positionTitle: data.positionTitle || '',
-                companyName: data.companyName || '',
-                industry: 'umum',
-              })}
-              disabled={generating !== null}
-              className="flex-shrink-0"
-            >
-              {generating === 'full' ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Wand2 className="w-4 h-4 mr-2" />
-              )}
-              {generating === 'full' ? 'Generating...' : 'Generate Semua'}
-            </Button>
+            <div>
+              <h3 className="font-semibold text-sm">Mode Manual</h3>
+              <p className="text-xs text-muted-foreground">
+                Isi setiap bagian secara manual. Lengkapi Job Desc, Tugas, KRA, dan Proses Bisnis di setiap langkah.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -295,10 +276,7 @@ export function BuilderView({
                 <CardTitle className="flex items-center gap-2"><ListChecks className="w-5 h-5 text-primary" /> Job Description</CardTitle>
                 <CardDescription>Wewenang, tanggung jawab, dan tujuan jabatan</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={() => generate('jobdesc')} disabled={generating !== null}>
-                {generating === 'jobdesc' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
-                Generate AI
-              </Button>
+
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -342,10 +320,7 @@ export function BuilderView({
                 <CardTitle className="flex items-center gap-2"><ListChecks className="w-5 h-5 text-primary" /> Pembagian Tugas</CardTitle>
                 <CardDescription>Tugas pokok, harian, mingguan, dan bulanan</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={() => generate('duties')} disabled={generating !== null}>
-                {generating === 'duties' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
-                Generate AI
-              </Button>
+
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -375,13 +350,10 @@ export function BuilderView({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <CardTitle className="flex items-center gap-2"><Target className="w-5 h-5 text-primary" /> Key Result Area (KRA)</CardTitle>
-                <CardDescription>Indikator hasil kerja & cara pengukuran. Buat manual atau generate AI.</CardDescription>
+                <CardDescription>Indikator hasil kerja & cara pengukuran. Buat manual sesuai kebutuhan.</CardDescription>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => generate('kra')} disabled={generating !== null}>
-                  {generating === 'kra' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
-                  Generate AI
-                </Button>
+
                 <Button size="sm" onClick={() => addKra()} style={{ backgroundColor: data.accentColor || '#b45309' }}>
                   <Plus className="w-4 h-4 mr-1" /> Tambah Manual
                 </Button>
@@ -430,13 +402,10 @@ export function BuilderView({
               <div>
                 <CardTitle className="flex items-center gap-2"><Workflow className="w-5 h-5 text-primary" /> Proses Bisnis (BPMN 2.0)</CardTitle>
                 <CardDescription>
-                  Buat proses secara manual dengan swim lane & diagram BPMN, atau generate dengan AI.
+                  Buat proses bisnis dengan swim lane & diagram BPMN 2.0 secara manual.
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={() => generate('processes')} disabled={generating !== null}>
-                {generating === 'processes' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
-                Generate AI
-              </Button>
+
             </div>
           </CardHeader>
           <CardContent>
