@@ -52,3 +52,15 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Database files (jangan commit database ke git)
+db/*.db
+db/*.db-journal
+
+# Upload folder
+/upload/
+/download/
+verify-screenshots/
+
+# Deploy temp files
+tmp/

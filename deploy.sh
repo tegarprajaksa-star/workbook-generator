@@ -1,73 +1,116 @@
 #!/bin/bash
 # ==========================================
-# SCRIPT DEPLOY OTOMATIS
+# SCRIPT DEPLOY OTOMATIS - DIGITALOCEAN
 # ==========================================
 # Cara pakai: bash deploy.sh
+# 
 # Script ini akan:
-# 1. Cek dependencies (Docker)
-# 2. Build aplikasi
+# 1. Cek Docker terinstall
+# 2. Build aplikasi jadi container
 # 3. Jalan aplikasi
-# 4. Beri info akses
+# 4. Setup auto-restart saat server reboot
+# 5. Beri info akses
 
 set -e
 
-echo "🚀 Deploy Workbook Generator"
-echo "=============================="
+echo ""
+echo "🚀 ======================================== 🚀"
+echo "   DEPLOY WORKBOOK GENERATOR"
+echo "🚀 ======================================== 🚀"
 echo ""
 
 # Cek Docker
 if ! command -v docker &> /dev/null; then
     echo "❌ Docker belum terinstall."
     echo ""
-    echo "📝 Cara install Docker:"
+    echo "📝 Install Docker dulu dengan command:"
+    echo ""
     echo "   curl -fsSL https://get.docker.com -o get-docker.sh"
-    echo "   sudo sh get-docker.sh"
+    echo "   sh get-docker.sh"
+    echo ""
+    echo "Setelah itu, jalankan lagi: bash deploy.sh"
     echo ""
     exit 1
 fi
 
-# Cek Docker Compose
-if ! command -v docker-compose &> /dev/null; then
-    if ! docker compose version &> /dev/null; then
-        echo "❌ Docker Compose belum terinstall."
-        echo "   Docker Compose biasanya sudah termasuk dengan Docker."
-        exit 1
-    fi
+echo "✅ Docker terdeteksi: $(docker --version)"
+echo ""
+
+# Cek docker compose
+COMPOSE_CMD=""
+if docker compose version &> /dev/null; then
+    COMPOSE_CMD="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+else
+    echo "❌ Docker Compose tidak ditemukan."
+    echo "   Install Docker Compose plugin atau docker-compose."
+    exit 1
 fi
 
-echo "✅ Docker terdeteksi"
+echo "✅ Docker Compose siap"
 echo ""
 
 # Build dan jalan aplikasi
-echo "📦 Building aplikasi (mungkin butuh 5-10 menit pertama kali)..."
-docker compose up -d --build
+echo "📦 Building aplikasi..."
+echo "   (Proses pertama butuh 5-10 menit, sabar ya)"
+echo ""
+
+$COMPOSE_CMD up -d --build
 
 echo ""
 echo "⏳ Menunggu aplikasi siap..."
-sleep 10
 
-# Cek aplikasi jalan
-if curl -s http://localhost:3000/api/auth/me > /dev/null 2>&1; then
-    echo ""
-    echo "🎉 BERHASIL! Aplikasi sudah jalan!"
-    echo ""
-    echo "════════════════════════════════════════════"
-    echo "📱 Akses aplikasi:"
-    echo "   http://$(curl -s ifconfig.me):3000"
-    echo ""
-    echo "👤 Akun Master Admin:"
-    echo "   Email: admin@workbookgen.app"
-    echo "   Password: admin123"
-    echo "════════════════════════════════════════════"
-    echo ""
-    echo "🔒 UBAH PASSWORD SETELAH LOGIN PERTAMA!"
-    echo ""
-    echo "📖 Untuk setup domain + HTTPS, baca PANDUAN_DEPLOY.md"
-    echo ""
-else
-    echo "⚠️  Aplikasi masih startup, tunggu 30 detik lalu coba:"
-    echo "   curl http://localhost:3000/api/auth/me"
-    echo ""
-    echo "Untuk cek log:"
-    echo "   docker compose logs -f"
-fi
+# Tunggu aplikasi siap (max 60 detik)
+for i in $(seq 1 12); do
+    if curl -s http://localhost:3000/api/auth/me > /dev/null 2>&1; then
+        echo ""
+        echo "🎉 ======================================== 🎉"
+        echo "   BERHASIL! Aplikasi sudah jalan!"
+        echo "🎉 ======================================== 🎉"
+        echo ""
+        
+        # Dapatkan IP publik
+        PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || echo "IP_SERVER_ANDA")
+        
+        echo "📱 Akses sementara (tanpa domain):"
+        echo "   http://$PUBLIC_IP:3000"
+        echo ""
+        echo "👤 Akun Master Admin:"
+        echo "   Email:    admin@workbookgen.app"
+        echo "   Password: admin123"
+        echo ""
+        echo "⚠️  WAJIB ganti password setelah login pertama!"
+        echo ""
+        echo "🔒 Untuk setup domain + HTTPS:"
+        echo "   Baca PANDUAN_DIGITALOCEAN.md (Langkah 6-7)"
+        echo ""
+        echo "📝 Command berguna:"
+        echo "   Cek status:  $COMPOSE_CMD ps"
+        echo "   Cek log:     $COMPOSE_CMD logs -f"
+        echo "   Restart:     $COMPOSE_CMD restart"
+        echo "   Stop:        $COMPOSE_CMD down"
+        echo ""
+        
+        # Setup auto-restart saat server reboot
+        echo "⚙️  Setup auto-restart saat server reboot..."
+        $COMPOSE_CMD enable 2>/dev/null || true
+        systemctl enable docker 2>/dev/null || true
+        
+        echo "✅ Auto-restart sudah aktif"
+        echo ""
+        echo "🎉 Selesai! Aplikasi Anda sudah online!"
+        echo ""
+        exit 0
+    fi
+    echo "   Menunggu... ($i/12)"
+    sleep 5
+done
+
+echo ""
+echo "⚠️  Aplikasi masih startup. Cek status:"
+echo ""
+echo "   $COMPOSE_CMD ps"
+echo "   $COMPOSE_CMD logs -f"
+echo ""
+echo "Kalau ada error, kirim log ke developer."

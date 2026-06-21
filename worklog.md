@@ -492,3 +492,28 @@ Stage Summary:
 - Docker-based: jalan di server manapun (Ubuntu, Debian, dll)
 - SQLite dengan persistent volume: data tidak hilang saat restart
 - Panduan lengkap dalam Bahasa Indonesia, bahasa awam
+
+---
+Task ID: 15
+Agent: Orchestrator
+Task: Panduan deploy khusus DigitalOcean untuk pemula
+
+Work Log:
+- Created PANDUAN_DIGITALOCEAN.md — panduan 8 langkah deploy ke DigitalOcean:
+  - Langkah 1: Buat Droplet (VPS) di DigitalOcean — pilih Singapore, Ubuntu 24.04, $6/month
+  - Langkah 2: Akses server via SSH (Windows PowerShell/Mac Terminal)
+  - Langkah 3: Upload project ke server (pakai Git/GitHub — recommended)
+  - Langkah 4: Install Docker (3 command copy-paste)
+  - Langkah 5: Jalankan aplikasi dengan `bash deploy.sh` (1 command)
+  - Langkah 6: Setup domain di Cloudflare (gratis, HTTPS include)
+  - Langkah 7: Setup Cloudflare Tunnel (supaya tidak perlu buka port)
+  - Langkah 8: Test hasil akhir + login
+- Updated deploy.sh: auto-detect docker compose, tunggu aplikasi siap (60s), setup auto-restart, tampilkan info lengkap
+- Updated .gitignore: exclude db files, upload folder, temp files
+- Panduan include: troubleshooting, cara backup, cara update, checklist final, tips hemat
+
+Stage Summary:
+- User tinggal ikuti PANDUAN_DIGITALOCEAN.md step by step
+- Semua technical sudah disiapkan (Dockerfile, docker-compose, deploy.sh)
+- Bahasa sederhana, cocok untuk pemula yang "buta soal deploy"
+- Cloudflare Tunnel untuk HTTPS gratis tanpa setup SSL manual
