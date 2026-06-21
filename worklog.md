@@ -89,3 +89,21 @@ Stage Summary:
 - BPMN 2.0 flow now visual and clear (SVG diagram with swim lanes, not just tables)
 - Users can manually create/edit processes OR generate with AI (both options available)
 - Branding "Developed by Arah Daya Consulting - Coach Tegar Prajaksa" added throughout app and exports
+
+---
+Task ID: 4
+Agent: Orchestrator
+Task: Fix overlapping/messy BPMN diagram
+
+Work Log:
+- Redesigned BPMN layout algorithm: main-flow steps get sequential columns; CORRECTION steps placed in SAME column as their parent gateway (not far away)
+- Increased cell height (150px) and width (148px) to give shapes enough room
+- Made shape dimensions consistent with cell size (112×46px tasks, 52px gateway diamond)
+- Removed confusing "return" arrows from corrections (they're terminal branches; gateway YA arrow shows main flow continuation)
+- Enlarged YA/TIDAK label badges (40×20px, 11pt bold) for readability
+- Routed correction arrows from gateway bottom/top edge (not through gateway label)
+- Verified with VLM (AI vision): P01 (13 steps, 3 lanes, 3 gateways + corrections) and P02 (12 steps, 3 lanes) both confirmed: no overlapping shapes, all shapes inside swim lanes, clean arrows, readable labels, neat and professional
+
+Stage Summary:
+- BPMN 2.0 diagram now renders cleanly: swim lanes clearly separated, shapes non-overlapping, arrows routed orthogonally without crossing shapes, YA/TIDAK labels readable
+- VLM verification passed all 5 criteria for both test diagrams

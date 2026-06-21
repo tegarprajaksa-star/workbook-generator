@@ -10,11 +10,17 @@ type Props = {
   compact?: boolean
 }
 
-// BPMN 2.0 shape renderer with swim lanes.
-// Lays steps out on a grid (column = step order, row = lane index),
-// draws proper BPMN shapes (start circle, task rounded-rect, gateway diamond,
-// end thick circle, correction red rect), and connects them with arrows.
-// Gateway branches (YA/TIDAK) are routed to their target steps.
+// BPMN 2.0 diagram with clean swim-lane layout.
+//
+// Layout algorithm:
+//  1. Main-flow steps (START/TASK/GATEWAY/END) are placed left→right in
+//     sequential columns based on their order.
+//  2. CORRECTION steps are placed in the SAME column as the gateway that
+//     branches to them (the gateway whose noTargetOrder === step.order),
+//     but in their own lane. This keeps "TIDAK" branches visually attached
+//     to their decision point instead of floating far away.
+//  3. Arrows are routed orthogonally from shape edge to shape edge, with
+//     elbows that avoid crossing through other shapes.
 export function BpmnDiagram({ lanes, steps, accentColor = '#b45309', compact = false }: Props) {
   const layout = useMemo(() => computeLayout(lanes, steps), [lanes, steps])
 
@@ -26,8 +32,8 @@ export function BpmnDiagram({ lanes, steps, accentColor = '#b45309', compact = f
     )
   }
 
-  const { colW, rowH, padX, padY, laneHeaderW, width, height, positions } = layout
-  const scale = compact ? 0.7 : 1
+  const { cellW, cellH, padX, padY, laneHeaderW, width, height, positions, arrows, colCount } = layout
+  const scale = compact ? 0.85 : 1
 
   return (
     <div className="overflow-x-auto scrollbar-thin">
@@ -38,46 +44,50 @@ export function BpmnDiagram({ lanes, steps, accentColor = '#b45309', compact = f
         style={{ minWidth: '100%' }}
         className="select-none"
       >
-        {/* Swim lane backgrounds + headers */}
+        <defs>
+          <marker id="ah-gray" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L8,5 L0,10 Z" fill="#78716c" />
+          </marker>
+          <marker id="ah-green" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L8,5 L0,10 Z" fill="#16a34a" />
+          </marker>
+          <marker id="ah-red" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L8,5 L0,10 Z" fill="#dc2626" />
+          </marker>
+        </defs>
+
+        {/* Swim-lane backgrounds */}
         {lanes.map((lane, i) => {
-          const y = padY + i * rowH
+          const y = padY + i * cellH
           return (
-            <g key={i}>
+            <g key={`lane-${i}`}>
               <rect
-                x={padX}
+                x={padX + laneHeaderW}
                 y={y}
-                width={width - padX - padX}
-                height={rowH}
+                width={colCount * cellW}
+                height={cellH}
                 fill={i % 2 === 0 ? '#fafaf9' : '#ffffff'}
                 stroke="#e7e5e4"
                 strokeWidth={1}
               />
-              {/* Lane header (left vertical label) */}
-              <rect
-                x={0}
-                y={y}
-                width={laneHeaderW}
-                height={rowH}
-                fill={accentColor}
-                opacity={0.12}
-              />
+              {/* Lane header */}
+              <rect x={padX} y={y} width={laneHeaderW} height={cellH} fill={accentColor} opacity={0.13} />
               <text
-                x={laneHeaderW / 2}
-                y={y + rowH / 2}
+                x={padX + laneHeaderW / 2}
+                y={y + cellH / 2}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize={compact ? 9 : 11}
                 fontWeight={600}
                 fill="#44403c"
-                transform={`rotate(0 ${laneHeaderW / 2} ${y + rowH / 2})`}
               >
-                {lane.length > 18 ? lane.slice(0, 17) + '…' : lane}
+                {truncate(lane, compact ? 14 : 18)}
               </text>
               <line
-                x1={laneHeaderW}
+                x1={padX + laneHeaderW}
                 y1={y}
-                x2={laneHeaderW}
-                y2={y + rowH}
+                x2={padX + laneHeaderW}
+                y2={y + cellH}
                 stroke={accentColor}
                 strokeWidth={1.5}
                 opacity={0.4}
@@ -90,42 +100,42 @@ export function BpmnDiagram({ lanes, steps, accentColor = '#b45309', compact = f
         <rect
           x={padX}
           y={padY}
-          width={width - padX - padX}
-          height={lanes.length * rowH}
+          width={laneHeaderW + colCount * cellW}
+          height={lanes.length * cellH}
           fill="none"
           stroke="#d6d3d1"
           strokeWidth={1.5}
         />
 
-        {/* Arrows (drawn first so shapes overlay them) */}
-        {layout.arrows.map((a, i) => (
+        {/* Arrows (under shapes) */}
+        {arrows.map((a, i) => (
           <g key={`arr-${i}`}>
             <path
               d={a.path}
               fill="none"
               stroke={a.color}
-              strokeWidth={1.5}
-              markerEnd="url(#arrowhead)"
+              strokeWidth={1.6}
+              markerEnd={a.color === '#16a34a' ? 'url(#ah-green)' : a.color === '#dc2626' ? 'url(#ah-red)' : 'url(#ah-gray)'}
             />
             {a.label && (
               <g>
                 <rect
-                  x={a.labelX - 14}
-                  y={a.labelY - 8}
-                  width={28}
-                  height={16}
-                  rx={3}
-                  fill="#fff"
+                  x={a.labelX - 20}
+                  y={a.labelY - 10}
+                  width={40}
+                  height={20}
+                  rx={5}
+                  fill="#ffffff"
                   stroke={a.color}
-                  strokeWidth={1}
+                  strokeWidth={1.5}
                 />
                 <text
                   x={a.labelX}
-                  y={a.labelY}
+                  y={a.labelY + 1}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fontSize={9}
-                  fontWeight={700}
+                  fontSize={11}
+                  fontWeight={800}
                   fill={a.color}
                 >
                   {a.label}
@@ -135,58 +145,20 @@ export function BpmnDiagram({ lanes, steps, accentColor = '#b45309', compact = f
           </g>
         ))}
 
-        {/* Arrowhead marker definition */}
-        <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="8"
-            markerHeight="8"
-            refX="7"
-            refY="4"
-            orient="auto"
-          >
-            <polygon points="0 0, 8 4, 0 8" fill="#78716c" />
-          </marker>
-          <marker
-            id="arrowhead-red"
-            markerWidth="8"
-            markerHeight="8"
-            refX="7"
-            refY="4"
-            orient="auto"
-          >
-            <polygon points="0 0, 8 4, 0 8" fill="#dc2626" />
-          </marker>
-          <marker
-            id="arrowhead-green"
-            markerWidth="8"
-            markerHeight="8"
-            refX="7"
-            refY="4"
-            orient="auto"
-          >
-            <polygon points="0 0, 8 4, 0 8" fill="#16a34a" />
-          </marker>
-        </defs>
-
         {/* Shapes */}
-        {positions.map((pos) => {
-          const step = pos.step
-          const cfg = SHAPE_CONFIG[step.type] || SHAPE_CONFIG.TASK
-          return (
-            <g key={step.order} transform={`translate(${pos.x}, ${pos.y})`}>
-              {renderShape(step, cfg, accentColor, compact)}
-            </g>
-          )
-        })}
+        {positions.map((pos) => (
+          <g key={pos.step.order} transform={`translate(${pos.cx}, ${pos.cy})`}>
+            {renderShape(pos.step, accentColor, compact)}
+          </g>
+        ))}
       </svg>
     </div>
   )
 }
 
-const SHAPE_CONFIG: Record<string, {
-  fill: string; stroke: string; text: string; label: string
-}> = {
+// ---------- Shape rendering ----------
+
+const SHAPE_CFG: Record<string, { fill: string; stroke: string; text: string; label: string }> = {
   START: { fill: '#dcfce7', stroke: '#16a34a', text: '#15803d', label: 'Start' },
   TASK: { fill: '#fef3c7', stroke: '#d97706', text: '#92400e', label: 'Task' },
   GATEWAY: { fill: '#ffedd5', stroke: '#ea580c', text: '#9a3412', label: 'Gateway' },
@@ -194,56 +166,53 @@ const SHAPE_CONFIG: Record<string, {
   CORRECTION: { fill: '#fee2e2', stroke: '#dc2626', text: '#991b1b', label: 'Koreksi' },
 }
 
-function renderShape(
-  step: BpmnStep,
-  cfg: { fill: string; stroke: string; text: string; label: string },
-  accent: string,
-  compact: boolean
-) {
-  const w = compact ? 90 : 110
-  const h = compact ? 42 : 50
+function renderShape(step: BpmnStep, accent: string, compact: boolean) {
+  const cfg = SHAPE_CFG[step.type] || SHAPE_CFG.TASK
 
   if (step.type === 'START') {
+    const r = compact ? 15 : 17
     return (
       <g>
-        <circle cx={0} cy={0} r={compact ? 14 : 16} fill={cfg.fill} stroke={cfg.stroke} strokeWidth={2} />
-        <text x={0} y={compact ? 28 : 32} textAnchor="middle" fontSize={9} fontWeight={600} fill={cfg.text}>START</text>
-        <text x={0} y={compact ? -26 : -28} textAnchor="middle" fontSize={10} fontWeight={600} fill="#1c1917">{step.label}</text>
+        <circle cx={0} cy={0} r={r} fill={cfg.fill} stroke={cfg.stroke} strokeWidth={2.5} />
+        <text x={0} y={0} textAnchor="middle" dominantBaseline="middle" fontSize={9} fontWeight={700} fill={cfg.text}>START</text>
       </g>
     )
   }
 
   if (step.type === 'END') {
+    const r = compact ? 15 : 17
     return (
       <g>
-        <circle cx={0} cy={0} r={compact ? 14 : 16} fill={cfg.fill} stroke={cfg.stroke} strokeWidth={4} />
-        <text x={0} y={compact ? 28 : 32} textAnchor="middle" fontSize={9} fontWeight={600} fill={cfg.text}>END</text>
+        <circle cx={0} cy={0} r={r} fill={cfg.fill} stroke={cfg.stroke} strokeWidth={4} />
+        <text x={0} y={0} textAnchor="middle" dominantBaseline="middle" fontSize={9} fontWeight={700} fill={cfg.text}>END</text>
       </g>
     )
   }
 
   if (step.type === 'GATEWAY') {
-    const s = compact ? 20 : 24
+    const s = compact ? 22 : 26
     return (
       <g>
-        <polygon
-          points={`0,${-s} ${s},0 0,${s} ${-s},0`}
-          fill={cfg.fill}
-          stroke={cfg.stroke}
-          strokeWidth={2}
-        />
-        <text x={0} y={3} textAnchor="middle" fontSize={compact ? 11 : 13} fontWeight={700} fill={cfg.text}>?</text>
-        <text x={0} y={compact ? -32 : -36} textAnchor="middle" fontSize={10} fontWeight={600} fill="#1c1917">{step.label}</text>
+        <polygon points={`0,${-s} ${s},0 0,${s} ${-s},0`} fill={cfg.fill} stroke={cfg.stroke} strokeWidth={2.5} />
+        <text x={0} y={1} textAnchor="middle" dominantBaseline="middle" fontSize={compact ? 13 : 15} fontWeight={800} fill={cfg.text}>?</text>
+        {/* label above */}
+        <text x={0} y={-s - (compact ? 6 : 8)} textAnchor="middle" fontSize={compact ? 9 : 10} fontWeight={600} fill="#1c1917">
+          {wrap(step.label, compact ? 13 : 15).map((ln, i) => (
+            <tspan key={i} x={0} dy={i === 0 ? 0 : -11}>{ln}</tspan>
+          ))}
+        </text>
         {step.sla && (
-          <text x={0} y={compact ? 38 : 42} textAnchor="middle" fontSize={8} fill="#78716c">SLA {step.sla}</text>
+          <text x={0} y={s + (compact ? 16 : 18)} textAnchor="middle" fontSize={8} fill="#78716c">SLA {step.sla}</text>
         )}
       </g>
     )
   }
 
-  // TASK or CORRECTION
-  const isCorrection = step.type === 'CORRECTION'
-  const rx = isCorrection ? 4 : 10
+  // TASK or CORRECTION (rounded rect)
+  const w = compact ? 96 : 112
+  const h = compact ? 42 : 46
+  const isCorr = step.type === 'CORRECTION'
+  const lines = wrap(step.label, compact ? 12 : 15)
   return (
     <g>
       <rect
@@ -251,24 +220,24 @@ function renderShape(
         y={-h / 2}
         width={w}
         height={h}
-        rx={rx}
+        rx={isCorr ? 4 : 10}
         fill={cfg.fill}
         stroke={cfg.stroke}
-        strokeWidth={isCorrection ? 2 : 2}
-        strokeDasharray={isCorrection ? '5,3' : undefined}
+        strokeWidth={2}
+        strokeDasharray={isCorr ? '5,3' : undefined}
       />
-      {/* type badge */}
-      <text x={0} y={-h / 2 + (compact ? 9 : 10)} textAnchor="middle" fontSize={7} fontWeight={700} fill={cfg.text} opacity={0.7}>
+      {/* type badge at top */}
+      <text x={0} y={-h / 2 + 9} textAnchor="middle" fontSize={7} fontWeight={700} fill={cfg.text} opacity={0.65}>
         {cfg.label.toUpperCase()}
       </text>
       {/* label */}
-      <text x={0} y={compact ? 2 : 4} textAnchor="middle" fontSize={compact ? 8 : 9} fontWeight={600} fill="#1c1917">
-        {wrapText(step.label, compact ? 14 : 16).map((line, i) => (
-          <tspan key={i} x={0} dy={i === 0 ? 0 : 10}>{line}</tspan>
+      <text x={0} y={2} textAnchor="middle" fontSize={compact ? 9 : 10} fontWeight={600} fill="#1c1917">
+        {lines.map((ln, i) => (
+          <tspan key={i} x={0} dy={i === 0 ? 0 : 11}>{ln}</tspan>
         ))}
       </text>
       {step.sla && (
-        <text x={0} y={h / 2 - (compact ? 4 : 5)} textAnchor="middle" fontSize={7} fill="#78716c" fontWeight={600}>
+        <text x={0} y={h / 2 - 5} textAnchor="middle" fontSize={8} fill="#78716c" fontWeight={600}>
           ⏱ {step.sla}
         </text>
       )}
@@ -276,124 +245,223 @@ function renderShape(
   )
 }
 
-function wrapText(text: string, maxChars: number): string[] {
-  if (text.length <= maxChars) return [text]
-  const words = text.split(' ')
-  const lines: string[] = []
-  let current = ''
-  for (const w of words) {
-    if ((current + ' ' + w).trim().length <= maxChars) {
-      current = (current + ' ' + w).trim()
-    } else {
-      if (current) lines.push(current)
-      current = w
-    }
-  }
-  if (current) lines.push(current)
-  return lines.slice(0, 3) // max 3 lines
+function truncate(s: string, n: number): string {
+  return s.length > n ? s.slice(0, n - 1) + '…' : s
 }
 
-// Compute grid layout + arrow paths
-type Position = { x: number; y: number; step: BpmnStep }
+function wrap(text: string, maxChars: number): string[] {
+  if (!text) return ['']
+  if (text.length <= maxChars) return [text]
+  const words = text.split(/\s+/)
+  const result: string[] = []
+  let cur = ''
+  for (const w of words) {
+    if ((cur + ' ' + w).trim().length <= maxChars) {
+      cur = (cur + ' ' + w).trim()
+    } else {
+      if (cur) result.push(cur)
+      cur = w
+    }
+  }
+  if (cur) result.push(cur)
+  return result.slice(0, 3)
+}
+
+// ---------- Layout computation ----------
+
+type Position = { step: BpmnStep; col: number; lane: number; cx: number; cy: number; w: number; h: number }
 type Arrow = { path: string; label?: string; labelX: number; labelY: number; color: string }
 
 function computeLayout(lanes: string[], steps: BpmnStep[]) {
   const padX = 12
-  const padY = 16
-  const laneHeaderW = 70
-  const colW = 130
-  const rowH = 110
+  const padY = 20
+  const laneHeaderW = 72
+  const cellW = 148
+  const cellH = 150
 
-  // Sort steps by order
   const sorted = [...steps].sort((a, b) => a.order - b.order)
 
-  // Determine number of columns = max order
-  const maxOrder = sorted.length > 0 ? Math.max(...sorted.map(s => s.order)) : 1
-  const numCols = maxOrder
+  // Step lookup by order
+  const byOrder = new Map<number, BpmnStep>()
+  for (const s of sorted) byOrder.set(s.order, s)
 
-  const contentW = numCols * colW
-  const width = laneHeaderW + contentW + padX * 2
-  const height = padY * 2 + lanes.length * rowH
+  // ---- Column assignment ----
+  // Main-flow steps (non-correction) get sequential columns 0,1,2,...
+  // Correction steps get the column of their parent gateway.
+  const colByOrder = new Map<number, number>()
 
-  // Build a lookup: order → step, for gateway target resolution
-  const stepByOrder = new Map<number, BpmnStep>()
-  for (const s of sorted) stepByOrder.set(s.order, s)
+  // First: identify main-flow steps and assign sequential columns
+  let mainCol = 0
+  const mainFlowOrders: number[] = []
+  for (const s of sorted) {
+    if (s.type !== 'CORRECTION') {
+      colByOrder.set(s.order, mainCol)
+      mainFlowOrders.push(s.order)
+      mainCol++
+    }
+  }
 
-  // Position each step at (column for its order, row for its lane)
+  // Second: for each correction step, find the gateway that points to it
+  // (the gateway whose noTargetOrder === correction.order), and assign
+  // the correction to the same column as that gateway.
+  for (const s of sorted) {
+    if (s.type === 'CORRECTION') {
+      let parentGateway: BpmnStep | undefined
+      for (const g of sorted) {
+        if (g.type === 'GATEWAY' && g.noTargetOrder === s.order) {
+          parentGateway = g
+          break
+        }
+      }
+      if (parentGateway) {
+        colByOrder.set(s.order, colByOrder.get(parentGateway.order) ?? mainCol)
+      } else {
+        // No parent gateway found — place at end
+        colByOrder.set(s.order, mainCol)
+        mainCol++
+      }
+    }
+  }
+
+  const colCount = Math.max(mainCol, 1)
+
+  // ---- Positions ----
   const positions: Position[] = sorted.map((step) => {
-    const col = step.order - 1
-    const x = padX + laneHeaderW + col * colW + colW / 2
-    const y = padY + step.lane * rowH + rowH / 2
-    return { x, y, step }
+    const col = colByOrder.get(step.order) ?? 0
+    const lane = step.lane
+    const cx = padX + laneHeaderW + col * cellW + cellW / 2
+    const cy = padY + lane * cellH + cellH / 2
+    const w = compact_shapeW(step.type)
+    const h = compact_shapeH(step.type)
+    return { step, col, lane, cx, cy, w, h }
   })
 
   const posByOrder = new Map<number, Position>()
   for (const p of positions) posByOrder.set(p.step.order, p)
 
-  // Build arrows
+  // ---- Arrows ----
   const arrows: Arrow[] = []
+
   for (let i = 0; i < sorted.length; i++) {
     const step = sorted[i]
-    const from = posByOrder.get(step.order)!
+    const from = posByOrder.get(step.order)
+    if (!from) continue
 
     if (step.type === 'GATEWAY') {
-      // YA branch → yesTargetOrder
+      // YA branch — goes to the next main-flow step (usually rightward)
       if (step.yesTargetOrder) {
         const to = posByOrder.get(step.yesTargetOrder)
         if (to) {
-          arrows.push(buildArrow(from, to, '✓ YA', '#16a34a'))
+          arrows.push(makeArrow(from, to, '✓ YA', '#16a34a', 'right'))
         }
       }
-      // TIDAK branch → noTargetOrder
+      // TIDAK branch — goes to the correction (usually downward to another lane)
       if (step.noTargetOrder) {
         const to = posByOrder.get(step.noTargetOrder)
         if (to) {
-          arrows.push(buildArrow(from, to, '✗ TIDAK', '#dc2626'))
+          // Exit gateway from the bottom (if correction is below) or top (if above)
+          // to avoid overlapping with the gateway's label text above it.
+          const dir = to.lane > from.lane ? 'down' : 'up'
+          arrows.push(makeArrow(from, to, '✗ TIDAK', '#dc2626', dir))
         }
       }
-    } else if (step.type !== 'END') {
-      // Sequential: connect to next step in sequence (unless this is a gateway's target coming back)
-      // Find the next step by order
+    } else if (step.type !== 'END' && step.type !== 'CORRECTION') {
+      // Main-flow sequential: connect to next step by order
       const nextOrder = step.order + 1
       const to = posByOrder.get(nextOrder)
       if (to) {
-        // Skip if the next step is a correction branch target that's already covered by a gateway
-        // Simple rule: always draw sequential arrow for non-gateway steps
-        arrows.push(buildArrow(from, to, undefined, '#78716c'))
+        arrows.push(makeArrow(from, to, undefined, '#78716c', 'right'))
       }
     }
+    // CORRECTION steps: no outgoing arrow (they are terminal correction branches
+    // that loop back conceptually — the gateway's YA arrow already shows the
+    // main flow continuation).
   }
 
-  return { colW, rowH, padX, padY, laneHeaderW, width, height, positions, arrows }
+  const width = padX * 2 + laneHeaderW + colCount * cellW
+  const height = padY * 2 + lanes.length * cellH
+
+  return { cellW, cellH, padX, padY, laneHeaderW, width, height, positions, arrows, colCount }
 }
 
-function buildArrow(from: Position, to: Position, label: string | undefined, color: string): Arrow {
-  const dx = to.x - from.x
-  const dy = to.y - from.y
+function compact_shapeW(type: string): number {
+  if (type === 'START' || type === 'END') return 34
+  if (type === 'GATEWAY') return 52
+  return 112
+}
+function compact_shapeH(type: string): number {
+  if (type === 'START' || type === 'END') return 34
+  if (type === 'GATEWAY') return 52
+  return 46
+}
+
+// Build an orthogonal arrow path from one shape to another.
+// `dir` hints the preferred exit direction: 'right' (exit right edge),
+// 'down' (exit bottom), 'up' (exit top).
+function makeArrow(from: Position, to: Position, label: string | undefined, color: string, dir: 'right' | 'down' | 'up'): Arrow {
+  const dx = to.cx - from.cx
+  const dy = to.cy - from.cy
+  const sameCol = Math.abs(dx) < 30
   const sameRow = Math.abs(dy) < 30
 
   let path: string
   let labelX: number
   let labelY: number
 
+  // Half-sizes for edge offsets
+  const fromHW = from.w / 2 + 2
+  const fromHH = from.h / 2 + 2
+  const toHW = to.w / 2 + 2
+  const toHH = to.h / 2 + 2
+
   if (sameRow) {
-    // Straight horizontal arrow
-    const startX = from.x + 55
-    const endX = to.x - 55
-    path = `M ${startX} ${from.y} L ${endX} ${to.y}`
-    labelX = (startX + endX) / 2
-    labelY = from.y - 10
-  } else if (dx > 0) {
-    // Diagonal down-right: use elbow
-    const midX = (from.x + to.x) / 2
-    path = `M ${from.x + 55} ${from.y} L ${midX} ${from.y} L ${midX} ${to.y} L ${to.x - 55} ${to.y}`
-    labelX = midX
-    labelY = (from.y + to.y) / 2
+    // Same lane — straight horizontal
+    const sx = from.cx + fromHW
+    const ex = to.cx - toHW
+    path = `M ${sx} ${from.cy} L ${ex} ${to.cy}`
+    labelX = (sx + ex) / 2
+    labelY = from.cy - 12
+  } else if (sameCol) {
+    // Same column, different lane — vertical
+    if (to.cy > from.cy) {
+      // going down
+      const sy = from.cy + fromHH
+      const ey = to.cy - toHH
+      path = `M ${from.cx} ${sy} L ${to.cx} ${ey}`
+      labelX = from.cx + 22
+      labelY = (sy + ey) / 2
+    } else {
+      // going up
+      const sy = from.cy - fromHH
+      const ey = to.cy + toHH
+      path = `M ${from.cx} ${sy} L ${to.cx} ${ey}`
+      labelX = from.cx + 22
+      labelY = (sy + ey) / 2
+    }
+  } else if (dir === 'down') {
+    // Gateway → correction below: exit bottom, go down, then right to target
+    const sy = from.cy + fromHH
+    const midY = to.cy
+    const ex = to.cx - toHW
+    path = `M ${from.cx} ${sy} L ${from.cx} ${midY} L ${ex} ${midY}`
+    labelX = from.cx + 24
+    labelY = (sy + midY) / 2
+  } else if (dir === 'up') {
+    // Gateway → correction above: exit top, go up, then right to target
+    const sy = from.cy - fromHH
+    const midY = to.cy
+    const ex = to.cx - toHW
+    path = `M ${from.cx} ${sy} L ${from.cx} ${midY} L ${ex} ${midY}`
+    labelX = from.cx + 24
+    labelY = (sy + midY) / 2
   } else {
-    // Same column or backwards: vertical-ish elbow
-    path = `M ${from.x} ${from.y + 25} L ${from.x} ${to.y - 25}`
-    labelX = from.x + 20
-    labelY = (from.y + to.y) / 2
+    // 'right' but different row & col — elbow: exit right, go right, then vertical, then right to target
+    const sx = from.cx + fromHW
+    const midX = from.cx + fromHW + (to.cx - from.cx - fromHW - toHW) / 2
+    const ex = to.cx - toHW
+    path = `M ${sx} ${from.cy} L ${midX} ${from.cy} L ${midX} ${to.cy} L ${ex} ${to.cy}`
+    labelX = midX
+    labelY = (from.cy + to.cy) / 2
   }
 
   return { path, label, labelX, labelY, color }
