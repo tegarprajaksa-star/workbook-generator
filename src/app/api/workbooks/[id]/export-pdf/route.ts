@@ -371,47 +371,55 @@ export async function GET(
     const docxPath = join(tmpDir, `${safeName}-${fileStamp}.docx`)
     await writeFile(docxPath, docxBuffer)
 
-    // LibreOffice needs a HOME directory for font config; set it explicitly
+    // LibreOffice needs a writable profile directory; create a unique one per request
+    const profileDir = `/tmp/lo-profile-${fileStamp}`
+    await mkdir(profileDir, { recursive: true }).catch(() => {})
     const env = { ...process.env, HOME: '/tmp', USERPROFILE: '/tmp' }
 
     let pdfConverted = false
-    // Try conversion with retries (LibreOffice can be slow on first launch)
+    let lastError: unknown = null
+    // Try conversion with retries (LibreOffice can fail on first launch or if locked)
     for (let attempt = 1; attempt <= 3 && !pdfConverted; attempt++) {
       try {
-        await execAsync(
-          `soffice --headless --norestore --nodefault --convert-to pdf --outdir "${tmpDir}" "${docxPath}"`,
-          { timeout: 60000, env }
-        )
-        // Verify the PDF was actually created
+        // Kill any existing soffice instances to avoid lock conflicts
+        await execAsync('pkill -f soffice 2>/dev/null; sleep 1', { timeout: 5000 }).catch(() => {})
+        
+        const cmd = `soffice --headless --norestore --nodefault --nologo --nofirststartwizard ` +
+          `-env:UserInstallation=file://${profileDir} ` +
+          `--convert-to pdf --outdir "${tmpDir}" "${docxPath}"`
+        await execAsync(cmd, { timeout: 90000, env })
+        
         const pdfPath = join(tmpDir, `${safeName}-${fileStamp}.pdf`)
         if (existsSync(pdfPath)) {
           pdfConverted = true
         }
       } catch (err) {
+        lastError = err
         console.error(`LibreOffice attempt ${attempt} error:`, err)
-        if (attempt === 3) {
-          await unlink(docxPath).catch(() => {})
-          return NextResponse.json(
-            { error: 'Gagal konversi ke PDF setelah 3 percobaan. Silakan coba lagi.' },
-            { status: 500 }
-          )
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 3000))
         }
-        // Wait before retry
-        await new Promise(r => setTimeout(r, 2000))
       }
     }
 
     const pdfPath = join(tmpDir, `${safeName}-${fileStamp}.pdf`)
     if (!pdfConverted || !existsSync(pdfPath)) {
+      // Cleanup
       await unlink(docxPath).catch(() => {})
-      return NextResponse.json({ error: 'PDF tidak ter-generate' }, { status: 500 })
+      await execAsync(`rm -rf ${profileDir}`).catch(() => {})
+      console.error('PDF conversion failed after 3 attempts. Last error:', lastError)
+      return NextResponse.json(
+        { error: 'Gagal konversi ke PDF. Silakan coba export DOCX lalu convert manual, atau coba lagi beberapa saat.' },
+        { status: 500 }
+      )
     }
 
     const pdfBuffer = await readFile(pdfPath)
 
-    // Cleanup temp files
+    // Cleanup temp files and profile dir
     await unlink(docxPath).catch(() => {})
     await unlink(pdfPath).catch(() => {})
+    await execAsync(`rm -rf ${profileDir}`).catch(() => {})
 
     return new NextResponse(pdfBuffer, {
       headers: {

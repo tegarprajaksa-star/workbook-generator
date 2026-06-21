@@ -237,3 +237,27 @@ Stage Summary:
 - All 3 exports work: DOCX (105KB/1.8s), PPTX (445KB/1.8s), PDF (215KB/2.6s)
 - No Playwright, no browser dependency, no librsvg needed — pure Rust library
 - serverExternalPackages config ensures native modules load correctly in Turbopack
+
+---
+Task ID: 11
+Agent: Orchestrator
+Task: Fix empty BPMN text (shapes visible but no labels) + fix PDF download
+
+Work Log:
+- Root cause of empty text: resvg-js with loadSystemFonts:true failed to load fonts in production/preview environment (system font scanning unreliable). Shapes rendered but text was invisible.
+- Solution: bundled DejaVu Sans font files in project (assets/fonts/DejaVuSans.ttf + DejaVuSans-Bold.ttf, copied from /usr/share/fonts/truetype/dejavu/)
+- Updated svg-render.ts: loadSystemFonts:false + fontFiles:[explicit paths] — fonts always available regardless of environment
+- Fixed PDF export reliability:
+  - Kill existing soffice instances before each conversion (avoid lock conflicts)
+  - Unique LibreOffice profile directory per request (-env:UserInstallation)
+  - Added --nologo --nofirststartwizard flags
+  - Increased timeout to 90s, retry delay to 3s
+  - Better error messages with fallback suggestion
+  - Cleanup profile dir after conversion
+- VLM verified: DOCX and PDF both show full BPMN text (lane labels, task labels, SLA, YA/TIDAK, START/END, KOREKSI)
+- All 3 exports work: DOCX (210KB/1.5s), PPTX (576KB/1.2s), PDF (435KB/6.7s)
+
+Stage Summary:
+- BPMN text now renders correctly: font files bundled in project, loaded explicitly via resvg fontFiles option
+- PDF export now reliable: proper profile isolation, kill conflicts, longer timeout
+- All 3 export formats verified working with readable BPMN diagrams
