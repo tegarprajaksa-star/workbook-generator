@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   Loader2, Wand2, Save, ArrowLeft, Sparkles, Briefcase, ListChecks,
   Workflow, Target, FileText, CheckCircle2, ChevronRight, Info,
+  Plus, Trash2, Pencil, X,
 } from 'lucide-react'
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -15,8 +16,12 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { api, type SessionUser, type Workbook } from '@/lib/bpm-types'
+import { api, type SessionUser, type Workbook, type Kra } from '@/lib/bpm-types'
 import { toast } from 'sonner'
 import { ProcessEditor } from '@/components/wb/process-editor'
 
@@ -42,6 +47,9 @@ export function BuilderView({
   const [data, setData] = useState<Partial<Workbook>>(workbook || {})
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState<string | null>(null)
+  const [kraDialogOpen, setKraDialogOpen] = useState(false)
+  const [kraEditingIdx, setKraEditingIdx] = useState<number>(-1)
+  const [kraForm, setKraForm] = useState<Kra>({ name: '', formula: '', target: '', unit: '%' })
 
   const load = useCallback(async () => {
     if (!workbook) return
@@ -125,6 +133,44 @@ export function BuilderView({
       toast.success('Workbook disimpan!')
       onSaved(finalWb)
     }
+  }
+
+  // ---- KRA manual management ----
+  function addKra() {
+    setKraForm({ name: '', formula: '', target: '', unit: '%' })
+    setKraEditingIdx(-1)
+    setKraDialogOpen(true)
+  }
+
+  function editKra(idx: number) {
+    const current = JSON.parse(data.krasJson || '[]') as Kra[]
+    setKraForm(current[idx])
+    setKraEditingIdx(idx)
+    setKraDialogOpen(true)
+  }
+
+  function deleteKra(idx: number) {
+    const current = JSON.parse(data.krasJson || '[]') as Kra[]
+    const next = current.filter((_, i) => i !== idx)
+    saveField({ krasJson: JSON.stringify(next) })
+    toast.success('KRA dihapus')
+  }
+
+  async function saveKra(e: React.FormEvent) {
+    e.preventDefault()
+    if (!kraForm.name || !kraForm.formula) {
+      toast.error('Nama dan formula wajib diisi')
+      return
+    }
+    const current = JSON.parse(data.krasJson || '[]') as Kra[]
+    if (kraEditingIdx >= 0) {
+      current[kraEditingIdx] = kraForm
+    } else {
+      current.push(kraForm)
+    }
+    await saveField({ krasJson: JSON.stringify(current) })
+    setKraDialogOpen(false)
+    toast.success(kraEditingIdx >= 0 ? 'KRA diperbarui' : 'KRA ditambahkan')
   }
 
   if (!workbook) {
@@ -329,24 +375,29 @@ export function BuilderView({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <CardTitle className="flex items-center gap-2"><Target className="w-5 h-5 text-primary" /> Key Result Area (KRA)</CardTitle>
-                <CardDescription>Indikator hasil kerja & cara pengukuran</CardDescription>
+                <CardDescription>Indikator hasil kerja & cara pengukuran. Buat manual atau generate AI.</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={() => generate('kra')} disabled={generating !== null}>
-                {generating === 'kra' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
-                Generate AI
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => generate('kra')} disabled={generating !== null}>
+                  {generating === 'kra' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
+                  Generate AI
+                </Button>
+                <Button size="sm" onClick={() => addKra()} style={{ backgroundColor: data.accentColor || '#b45309' }}>
+                  <Plus className="w-4 h-4 mr-1" /> Tambah Manual
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             {kras.length === 0 ? (
               <div className="text-center py-8 text-sm text-muted-foreground">
                 <Info className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                Belum ada KRA. Klik "Generate AI" untuk membuat otomatis.
+                Belum ada KRA. Buat manual atau generate dengan AI.
               </div>
             ) : (
               <div className="space-y-2">
                 {kras.map((k, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg border">
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/20 transition-colors">
                     <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">{i + 1}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
@@ -354,6 +405,15 @@ export function BuilderView({
                         <Badge className="bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400 text-xs">{k.target}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">{k.formula}</p>
+                      {k.unit && <p className="text-[10px] text-muted-foreground/70 mt-0.5">Satuan: {k.unit}</p>}
+                    </div>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => editKra(i)}>
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600" onClick={() => deleteKra(i)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -410,6 +470,66 @@ export function BuilderView({
           </Button>
         </div>
       </div>
+
+      {/* KRA manual editor dialog */}
+      <Dialog open={kraDialogOpen} onOpenChange={setKraDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{kraEditingIdx >= 0 ? 'Edit KRA' : 'Tambah KRA Baru'}</DialogTitle>
+            <DialogDescription>Lengkapi indikator hasil kerja</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={saveKra} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="kra-name">Nama KRA</Label>
+              <Input
+                id="kra-name"
+                placeholder="Contoh: Akurasi Order"
+                value={kraForm.name}
+                onChange={(e) => setKraForm({ ...kraForm, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="kra-formula">Formula / Cara Ukur</Label>
+              <Textarea
+                id="kra-formula"
+                rows={2}
+                placeholder="Contoh: Order benar ÷ total order × 100%"
+                value={kraForm.formula}
+                onChange={(e) => setKraForm({ ...kraForm, formula: e.target.value })}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="kra-target">Target</Label>
+                <Input
+                  id="kra-target"
+                  placeholder="Contoh: ≥ 98%"
+                  value={kraForm.target}
+                  onChange={(e) => setKraForm({ ...kraForm, target: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="kra-unit">Satuan</Label>
+                <Input
+                  id="kra-unit"
+                  placeholder="Contoh: %"
+                  value={kraForm.unit}
+                  onChange={(e) => setKraForm({ ...kraForm, unit: e.target.value })}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setKraDialogOpen(false)}>Batal</Button>
+              <Button type="submit" style={{ backgroundColor: data.accentColor || '#b45309' }}>
+                <Save className="w-4 h-4 mr-2" />
+                {kraEditingIdx >= 0 ? 'Simpan' : 'Tambah'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

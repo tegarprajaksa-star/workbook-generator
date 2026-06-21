@@ -3,11 +3,18 @@ import { db } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
-  Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType,
+  Table, TableRow, TableCell, WidthType, ShadingType,
   PageBreak, Header, Footer, PageNumber, ImageRun,
 } from 'docx'
 import sharp from 'sharp'
+import { writeFile, readFile, mkdir, unlink } from 'fs/promises'
+import { join } from 'path'
+import { existsSync } from 'fs'
+import { exec } from 'child_process'
+import { promisify } from 'util'
 import { generateBpmnSvg, type BpmnStep as BpmnStepT } from '@/lib/bpmn-svg'
+
+const execAsync = promisify(exec)
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +28,6 @@ function lines(text: string): string[] {
   return (text || '').split('\n').map(s => s.trim()).filter(Boolean)
 }
 
-// Convert BPMN SVG to PNG buffer for embedding in DOCX
 async function bpmnSvgToPng(lanes: string[], steps: Step[], accentColor: string): Promise<Buffer | null> {
   if (steps.length === 0 || lanes.length === 0) return null
   try {
@@ -133,7 +139,6 @@ export async function GET(
       heading: HeadingLevel.HEADING_1,
       children: [new TextRun({ text: '2. Wewenang dan Tanggung Jawab', color: accent })],
     }))
-
     children.push(new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: [
@@ -273,7 +278,7 @@ export async function GET(
         }))
       }
 
-      // BPMN flow chart IMAGE (embedded PNG)
+      // BPMN flow chart IMAGE
       children.push(new Paragraph({ children: [], spacing: { before: 300 } }))
       children.push(new Paragraph({
         heading: HeadingLevel.HEADING_2,
@@ -284,9 +289,8 @@ export async function GET(
       if (steps.length > 0 && lanes.length > 0) {
         const pngBuffer = await bpmnSvgToPng(lanes, steps, wb.accentColor || '#b45309')
         if (pngBuffer) {
-          // Get actual image dimensions to preserve aspect ratio
           const meta = await sharp(pngBuffer).metadata()
-          const targetWidth = 600 // points (~ page content width)
+          const targetWidth = 600
           const ratio = (meta.height || 400) / (meta.width || 1400)
           const targetHeight = Math.round(targetWidth * ratio)
           children.push(new Paragraph({
@@ -331,7 +335,7 @@ export async function GET(
       }
     }
 
-    // Build document
+    // Build DOCX document
     const doc = new Document({
       sections: [{
         properties: {},
@@ -358,17 +362,47 @@ export async function GET(
       }],
     })
 
-    const buffer = await Packer.toBuffer(doc)
+    const docxBuffer = await Packer.toBuffer(doc)
     const safeName = wb.title.replace(/[^a-zA-Z0-9-_ ]/g, '').replace(/\s+/g, '_')
 
-    return new NextResponse(buffer, {
+    // Convert DOCX to PDF using LibreOffice
+    const tmpDir = '/tmp/bpm-pdf-export'
+    if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true })
+    const docxPath = join(tmpDir, `${safeName}.docx`)
+    await writeFile(docxPath, docxBuffer)
+
+    try {
+      await execAsync(
+        `soffice --headless --convert-to pdf --outdir "${tmpDir}" "${docxPath}"`,
+        { timeout: 30000 }
+      )
+    } catch (err) {
+      console.error('LibreOffice conversion error:', err)
+      // Cleanup and return error
+      await unlink(docxPath).catch(() => {})
+      return NextResponse.json({ error: 'Gagal konversi ke PDF' }, { status: 500 })
+    }
+
+    const pdfPath = join(tmpDir, `${safeName}.pdf`)
+    if (!existsSync(pdfPath)) {
+      await unlink(docxPath).catch(() => {})
+      return NextResponse.json({ error: 'PDF tidak ter-generate' }, { status: 500 })
+    }
+
+    const pdfBuffer = await readFile(pdfPath)
+
+    // Cleanup temp files
+    await unlink(docxPath).catch(() => {})
+    await unlink(pdfPath).catch(() => {})
+
+    return new NextResponse(pdfBuffer, {
       headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="${safeName}.docx"`,
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${safeName}.pdf"`,
       },
     })
   } catch (error) {
-    console.error('DOCX export error:', error)
-    return NextResponse.json({ error: 'Gagal export DOCX: ' + (error as Error).message }, { status: 500 })
+    console.error('PDF export error:', error)
+    return NextResponse.json({ error: 'Gagal export PDF: ' + (error as Error).message }, { status: 500 })
   }
 }

@@ -124,3 +124,24 @@ Work Log:
 Stage Summary:
 - SLA text no longer overlaps — rendered as separate pills below shapes
 - Users can now sign up for a new account without demo credentials (toggle between Masuk and Daftar)
+
+---
+Task ID: 6
+Agent: Orchestrator
+Task: Fix END arrow, add KRA manual editor, add PDF export, embed BPMN images in exports
+
+Work Log:
+- Fixed END arrow bug: sequential arrow logic now skips CORRECTION steps when finding the next main-flow target, so the last task correctly connects to END
+- Created server-side BPMN SVG generator (src/lib/bpmn-svg.ts) with identical layout logic to client component
+- Updated DOCX export: BPMN flow chart now embedded as PNG image (via SVG→sharp→PNG→ImageRun) instead of table; 4 images embedded for 4 processes
+- Updated PPTX export: BPMN slide now shows the visual diagram image (via addImage with base64 PNG) instead of step table; 4 images embedded
+- Created PDF export route: generates DOCX with embedded BPMN images, converts to PDF via LibreOffice (soffice --headless)
+- Added "Tambah Manual" button to KRA section in builder; manual KRA editor dialog with fields: Nama KRA, Formula, Target, Satuan; edit/delete buttons per KRA item
+- Added PDF export button to preview view (top bar + bottom bar); now 3 export options: PDF, DOCX, PPTX
+- Verified: DOCX=163KB with 4 BPMN images, PPTX=587KB with 4 BPMN images, PDF=328KB 7 pages, SVG arrow count=5 (includes END arrow), VLM confirmed BPMN diagrams render cleanly in PDF
+
+Stage Summary:
+- KRA now has both manual editor (add/edit/delete) and AI generate options
+- END arrow fixed in BPMN diagram (main flow connects to END, skipping corrections)
+- 3 export formats: PDF, DOCX, PPTX — all embed BPMN flow chart as clean visual image
+- VLM verified: PDF pages show BPMN diagrams with swim lanes, boxes, diamonds, arrows — clean and readable

@@ -45,7 +45,7 @@ export function PreviewView({
 
   useEffect(() => { load() }, [load])
 
-  async function handleExport(format: 'docx' | 'pptx') {
+  async function handleExport(format: 'docx' | 'pptx' | 'pdf') {
     setExporting(format)
     try {
       const blob = await api<Blob>(`/workbooks/${initialWb.id}/export-${format}`)
@@ -95,6 +95,10 @@ export function PreviewView({
             <div className="flex gap-2 flex-shrink-0">
               <Button variant="outline" size="sm" onClick={onEdit}>
                 <Pencil className="w-4 h-4 mr-1" /> Edit
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleExport('pdf')} disabled={exporting !== null}>
+                {exporting === 'pdf' ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileText className="w-4 h-4 mr-1" />}
+                PDF
               </Button>
               <Button variant="outline" size="sm" onClick={() => handleExport('docx')} disabled={exporting !== null}>
                 {exporting === 'docx' ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileText className="w-4 h-4 mr-1" />}
@@ -328,14 +332,18 @@ export function PreviewView({
               <Sparkles className="w-4 h-4 inline mr-1" />
               Export buku panduan ke format siap pakai
             </div>
-            <div className="flex gap-2 ml-auto">
+            <div className="flex gap-2 ml-auto flex-wrap">
+              <Button variant="outline" onClick={() => handleExport('pdf')} disabled={exporting !== null}>
+                {exporting === 'pdf' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
+                PDF
+              </Button>
               <Button variant="outline" onClick={() => handleExport('docx')} disabled={exporting !== null}>
                 {exporting === 'docx' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
-                Download DOCX
+                DOCX
               </Button>
               <Button onClick={() => handleExport('pptx')} disabled={exporting !== null} style={{ backgroundColor: accent }}>
                 {exporting === 'pptx' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                Download PPTX
+                PPTX
               </Button>
             </div>
           </div>

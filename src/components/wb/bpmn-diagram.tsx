@@ -376,9 +376,14 @@ function computeLayout(lanes: string[], steps: BpmnStep[]) {
         }
       }
     } else if (step.type !== 'END' && step.type !== 'CORRECTION') {
-      // Main-flow sequential: connect to next step by order
-      const nextOrder = step.order + 1
-      const to = posByOrder.get(nextOrder)
+      // Main-flow sequential: connect to the NEXT non-correction step by order
+      // (skip corrections — they are side branches, not the main flow)
+      let nextOrder = step.order + 1
+      let to = posByOrder.get(nextOrder)
+      while (to && to.step.type === 'CORRECTION') {
+        nextOrder++
+        to = posByOrder.get(nextOrder)
+      }
       if (to) {
         arrows.push(makeArrow(from, to, undefined, '#78716c', 'right'))
       }

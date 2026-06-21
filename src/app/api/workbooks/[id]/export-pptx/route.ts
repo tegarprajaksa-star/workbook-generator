@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 import pptxgen from 'pptxgenjs'
+import sharp from 'sharp'
+import { generateBpmnSvg, type BpmnStep as BpmnStepT } from '@/lib/bpmn-svg'
 
 export const dynamic = 'force-dynamic'
 
@@ -172,31 +174,28 @@ export async function GET(
         ps1.addText(`Total SLA: ${proc.totalSla}`, { x: 0.5, y: 4.2, w: 12, h: 0.4, fontSize: 14, italic: true, color: '888888' })
       }
 
-      // BPMN flow slide
-      if (steps.length > 0) {
+      // BPMN flow chart IMAGE slide
+      if (steps.length > 0 && lanes.length > 0) {
         const ps2 = pptx.addSlide()
         ps2.addText(`${proc.code} — Alur Proses (BPMN 2.0)`, { x: 0.5, y: 0.3, w: 12, h: 0.6, fontSize: 24, bold: true, color: accent })
         ps2.addShape('rect', { x: 0.5, y: 0.9, w: 12.3, h: 0.03, fill: { color: accent } })
 
-        const stepRows = [
-          [{ text: 'No', options: { bold: true, fill: { color: accent }, color: 'FFFFFF' } },
-           { text: 'Tipe', options: { bold: true, fill: { color: accent }, color: 'FFFFFF' } },
-           { text: 'Aktivitas', options: { bold: true, fill: { color: accent }, color: 'FFFFFF' } },
-           { text: 'Lane', options: { bold: true, fill: { color: accent }, color: 'FFFFFF' } },
-           { text: 'SLA', options: { bold: true, fill: { color: accent }, color: 'FFFFFF' } },
-           { text: 'Cabang', options: { bold: true, fill: { color: accent }, color: 'FFFFFF' } }],
-          ...steps.map(s => [
-            String(s.order), s.type, s.label, lanes[s.lane] || '-', s.sla || '-', s.branchLabel || '',
-          ]),
-        ]
-        ps2.addTable(stepRows, {
-          x: 0.5, y: 1.1, w: 12.3,
-          colW: [0.5, 1.3, 5.5, 2.5, 1.2, 1.3],
-          fontSize: 11,
-          border: { type: 'solid', pt: 0.5, color: 'DDDDDD' },
-          rowH: 0.4,
-          valign: 'middle',
-        })
+        // Generate BPMN diagram as PNG and embed
+        try {
+          const svg = generateBpmnSvg(lanes, steps as unknown as BpmnStepT[], wb.accentColor || '#b45309')
+          const pngBuffer = await sharp(Buffer.from(svg))
+            .resize({ width: 1800, fit: 'inside' })
+            .png()
+            .toBuffer()
+          const meta = await sharp(pngBuffer).metadata()
+          const imgW = 12.3 // inches
+          const ratio = (meta.height || 600) / (meta.width || 1800)
+          const imgH = Math.min(imgW * ratio, 5.8) // cap height to fit slide
+          ps2.addImage({ data: 'image/png;base64,' + pngBuffer.toString('base64'), x: 0.5, y: 1.1, w: imgW, h: imgH })
+        } catch (err) {
+          console.error('BPMN image gen error:', err)
+          ps2.addText('Diagram BPMN tidak dapat ditampilkan', { x: 0.5, y: 3, w: 12, h: 0.5, fontSize: 14, color: '999999', align: 'center' })
+        }
       }
 
       // SOP slide
