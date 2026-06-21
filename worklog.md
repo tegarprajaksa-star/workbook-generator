@@ -65,3 +65,27 @@ Stage Summary:
 - Complete Workbook Generator SaaS: user fills position+company → AI generates full buku panduan (job desc, authority, responsibilities, duties, KRA, 4-6 BPMN processes with SOP/WI) → preview → export to PPTX or DOCX
 - Works for ANY position (tested: Barista, Apoteker)
 - Demo: demo@workbookgen.app / demo123
+
+---
+Task ID: 3
+Agent: Orchestrator
+Task: Improve BPMN diagram, add manual editor, add Arah Daya branding
+
+Work Log:
+- Built SVG-based BpmnDiagram component with proper BPMN 2.0 shapes: Start (green circle), Task (amber rounded rect), Gateway (orange diamond with ?), End (thick stone circle), Correction (red dashed rect)
+- Swim lanes rendered as horizontal rows with colored header column + alternating row backgrounds
+- Arrows with arrowhead markers connecting steps; gateway branches (YA green / TIDAK red) routed to target steps with labeled badges
+- SLA labels on each shape; wrapped text for long labels
+- Built ProcessEditor component with 3 tabs: Diagram BPMN (lanes + steps editor with live preview), Detail Proses, SOP & WI
+- Manual process editor: add/edit/delete lanes, steps (with type/lane/label/SLA/gateway targets), reorder steps, SOP editor
+- Created process CRUD API routes: POST /workbooks/[id]/processes, PUT/DELETE /workbooks/[id]/processes/[processId]
+- Integrated ProcessEditor into builder "Proses" step alongside "Generate AI" button — user can choose manual OR AI
+- Replaced preview BPMN section (old column-of-cards) with new visual BpmnDiagram
+- Added "Developed by Arah Daya Consulting · Coach Tegar Prajaksa, MBA" branding to: login screen, app footer, preview cover, DOCX cover page, PPTX cover slide + closing slide
+- ESLint: 0 errors
+- VLM verification confirmed BPMN diagram renders correctly with swim lanes, proper shapes, arrows, and YA/TIDAK labels
+
+Stage Summary:
+- BPMN 2.0 flow now visual and clear (SVG diagram with swim lanes, not just tables)
+- Users can manually create/edit processes OR generate with AI (both options available)
+- Branding "Developed by Arah Daya Consulting - Coach Tegar Prajaksa" added throughout app and exports

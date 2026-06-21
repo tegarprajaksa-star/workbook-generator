@@ -67,6 +67,7 @@ export async function GET(
     slide1.addText(`Posisi: ${wb.positionTitle}`, { x: 0.8, y: 4.0, w: 11, h: 0.5, fontSize: 22, color: lightAccentHex })
     slide1.addText('Job Description • BPMN 2.0 • SOP • Work Instruction • Form • KRA', { x: 0.8, y: 5.2, w: 11, h: 0.4, fontSize: 14, color: '888888' })
     slide1.addText(wb.companyTagline || 'Employee Workbook', { x: 0.8, y: 6.5, w: 11, h: 0.4, fontSize: 12, color: '666666', italic: true })
+    slide1.addText('Developed by Arah Daya Consulting · Coach Tegar Prajaksa, MBA', { x: 0.8, y: 7.0, w: 11, h: 0.3, fontSize: 10, color: lightAccentHex, bold: true })
 
     // ---- SLIDE 2: JOB DESCRIPTION ----
     const slide2 = pptx.addSlide()
@@ -229,6 +230,8 @@ export async function GET(
     last.addText('Halaman Pengesahan', { x: 0.8, y: 1.5, w: 11, h: 0.8, fontSize: 32, bold: true, color: 'FFFFFF' })
     last.addText('Dokumen kerja ini dapat disahkan setelah disesuaikan dengan struktur outlet.', { x: 0.8, y: 2.4, w: 11, h: 0.6, fontSize: 16, color: 'CCCCCC' })
     last.addText(`${wb.companyName} — ${wb.title}`, { x: 0.8, y: 5.5, w: 11, h: 0.5, fontSize: 14, color: '888888', italic: true })
+    last.addText('Developed by Arah Daya Consulting', { x: 0.8, y: 6.3, w: 11, h: 0.4, fontSize: 14, color: lightAccentHex, bold: true })
+    last.addText('Coach Tegar Prajaksa, MBA', { x: 0.8, y: 6.7, w: 11, h: 0.4, fontSize: 12, color: 'AAAAAA', italic: true })
 
     // Generate
     const buffer = (await pptx.write({ outputType: 'nodebuffer' })) as Buffer

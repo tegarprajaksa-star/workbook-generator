@@ -71,6 +71,16 @@ export async function GET(
       children: [new TextRun({ text: 'Job Description • BPMN 2.0 • SOP • Work Instruction • Form • KRA', size: 18, color: '888888' })],
       spacing: { before: 400 },
     }))
+    children.push(new Paragraph({ children: [], spacing: { before: 2400 } }))
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: 'Developed by Arah Daya Consulting', size: 18, color: accent, bold: true })],
+    }))
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: 'Coach Tegar Prajaksa, MBA', size: 16, color: '888888', italics: true })],
+      spacing: { after: 200 },
+    }))
     children.push(new Paragraph({ children: [new PageBreak()] }))
 
     // ---- 1. JOB DESCRIPTION ----

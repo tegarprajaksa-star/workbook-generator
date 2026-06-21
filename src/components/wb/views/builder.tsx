@@ -18,6 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { api, type SessionUser, type Workbook } from '@/lib/bpm-types'
 import { toast } from 'sonner'
+import { ProcessEditor } from '@/components/wb/process-editor'
 
 const STEPS = [
   { key: 'identity', label: 'Identitas', icon: Briefcase, desc: 'Perusahaan & posisi' },
@@ -369,7 +370,7 @@ export function BuilderView({
               <div>
                 <CardTitle className="flex items-center gap-2"><Workflow className="w-5 h-5 text-primary" /> Proses Bisnis (BPMN 2.0)</CardTitle>
                 <CardDescription>
-                  Alur proses dengan SOP & Work Instruction. {(() => { try { return JSON.parse(data.workbook?.processes?.length ? '[]' : '[]') } catch { return 0 } })()}
+                  Buat proses secara manual dengan swim lane & diagram BPMN, atau generate dengan AI.
                 </CardDescription>
               </div>
               <Button variant="outline" size="sm" onClick={() => generate('processes')} disabled={generating !== null}>
@@ -379,7 +380,12 @@ export function BuilderView({
             </div>
           </CardHeader>
           <CardContent>
-            <ProcessList workbookId={workbook.id} reloadKey={data.updatedAt || ''} />
+            <ProcessEditor
+              workbookId={workbook.id}
+              accentColor={data.accentColor || '#b45309'}
+              onGenerating={(g) => setGenerating(g ? 'processes' : null)}
+              reloadKey={data.updatedAt || ''}
+            />
           </CardContent>
         </Card>
       )}
@@ -404,56 +410,6 @@ export function BuilderView({
           </Button>
         </div>
       </div>
-    </div>
-  )
-}
-
-// Sub-component: shows processes for a workbook (read-only summary in builder)
-function ProcessList({ workbookId, reloadKey }: { workbookId: string; reloadKey: string }) {
-  const [processes, setProcesses] = useState<Array<{
-    id: string; code: string; name: string; description: string; totalSla: string; category: string
-    stepsJson: string; sopsJson: string
-  }>>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    api<{ workbook: { processes: typeof processes } }>(`/workbooks/${workbookId}`)
-      .then((d) => setProcesses(d.workbook.processes))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [workbookId, reloadKey])
-
-  if (loading) return <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-
-  if (processes.length === 0) {
-    return (
-      <div className="text-center py-8 text-sm text-muted-foreground">
-        <Info className="w-8 h-8 mx-auto mb-2 opacity-40" />
-        Belum ada proses. Klik "Generate AI" untuk membuat 4-6 proses bisnis lengkap dengan BPMN, SOP, dan Work Instruction.
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-2">
-      {processes.map(p => {
-        const stepCount = (() => { try { return JSON.parse(p.stepsJson || '[]').length } catch { return 0 } })()
-        const sopCount = (() => { try { return JSON.parse(p.sopsJson || '[]').length } catch { return 0 } })()
-        return (
-          <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg border">
-            <Badge variant="outline" className="font-mono">{p.code}</Badge>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm truncate">{p.name}</div>
-              <div className="text-xs text-muted-foreground truncate">{p.description}</div>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="secondary">{stepCount} langkah</Badge>
-              <Badge variant="secondary">{sopCount} SOP</Badge>
-              {p.totalSla && <Badge variant="outline">SLA {p.totalSla}</Badge>}
-            </div>
-          </div>
-        )
-      })}
     </div>
   )
 }

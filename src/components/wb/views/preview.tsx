@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   Loader2, Download, FileText, Pencil, ArrowLeft, Sparkles,
-  CheckCircle2, XCircle, CircleDot, Square, Zap, Shield, AlertTriangle,
-  Crown, Workflow, ArrowRight,
+  Shield, AlertTriangle, Crown, Workflow,
 } from 'lucide-react'
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -12,18 +11,9 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { api, type Workbook, type WorkbookProcess, type BpmnStep, type Sop } from '@/lib/bpm-types'
 import { toast } from 'sonner'
-
-const stepTypeConfig: Record<string, { icon: typeof CircleDot; color: string; bg: string; border: string; label: string }> = {
-  START: { icon: CircleDot, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-950/30', border: 'border-green-400', label: 'Start' },
-  TASK: { icon: Square, color: 'text-amber-700', bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-400', label: 'Task' },
-  GATEWAY: { icon: Zap, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-950/30', border: 'border-orange-400', label: 'Gateway' },
-  END: { icon: CheckCircle2, color: 'text-stone-600', bg: 'bg-stone-100 dark:bg-stone-800/40', border: 'border-stone-400', label: 'End' },
-  CORRECTION: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-950/30', border: 'border-red-400', label: 'Koreksi' },
-}
+import { BpmnDiagram } from '@/components/wb/bpmn-diagram'
 
 function lines(text: string): string[] {
   return (text || '').split('\n').map(s => s.trim()).filter(Boolean)
@@ -129,6 +119,9 @@ export function PreviewView({
           <p className="text-muted-foreground">Posisi: {wb.positionTitle}</p>
           <p className="text-xs text-muted-foreground mt-4">Job Description • BPMN 2.0 • SOP • Work Instruction • Form • KRA</p>
           {wb.companyTagline && <p className="text-xs text-muted-foreground/60 mt-1 italic">{wb.companyTagline}</p>}
+          <p className="text-[11px] text-muted-foreground/70 mt-6">
+            Developed by <span className="font-semibold" style={{ color: accent }}>Arah Daya Consulting</span> · Coach Tegar Prajaksa, MBA
+          </p>
         </div>
 
         <Separator />
@@ -276,41 +269,14 @@ export function PreviewView({
                 </div>
                 {proc.totalSla && <p className="text-xs text-muted-foreground italic mb-4">Total SLA: {proc.totalSla}</p>}
 
-                {/* BPMN flow */}
+                {/* BPMN flow diagram */}
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
                     <Workflow className="w-4 h-4" style={{ color: accent }} /> Alur Proses (BPMN 2.0)
                   </h4>
-                  {lanes.length > 0 && (
-                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                      {lanes.map((lane, li) => {
-                        const laneSteps = steps.filter(s => s.lane === li).sort((a, b) => a.order - b.order)
-                        return (
-                          <div key={li} className="flex-shrink-0 min-w-[180px]">
-                            <div className="text-xs font-semibold text-center pb-2 border-b-2 mb-2" style={{ borderColor: accent + '40' }}>{lane}</div>
-                            <div className="space-y-2">
-                              {laneSteps.map(step => {
-                                const cfg = stepTypeConfig[step.type] || stepTypeConfig.TASK
-                                return (
-                                  <div key={step.order} className={`rounded-lg border-2 ${cfg.border} ${cfg.bg} p-2`}>
-                                    <div className="flex items-center gap-1 mb-0.5">
-                                      <cfg.icon className={`w-3 h-3 ${cfg.color}`} />
-                                      <span className={`text-[9px] font-semibold ${cfg.color}`}>{cfg.label}</span>
-                                      {step.sla && <Badge variant="outline" className="text-[9px] px-1 py-0 ml-auto">{step.sla}</Badge>}
-                                    </div>
-                                    <p className="text-xs font-medium leading-tight">{step.label}</p>
-                                    {step.branchLabel && (
-                                      <Badge variant="outline" className={`text-[9px] mt-1 ${step.branchLabel === 'YA' ? 'text-green-600 border-green-400' : 'text-red-600 border-red-400'}`}>
-                                        {step.branchLabel === 'YA' ? '✓ YA' : '✗ TIDAK'}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })}
+                  {lanes.length > 0 && steps.length > 0 && (
+                    <div className="rounded-lg border bg-white p-3 overflow-x-auto">
+                      <BpmnDiagram lanes={lanes} steps={steps} accentColor={accent} />
                     </div>
                   )}
                 </div>

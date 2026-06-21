@@ -217,7 +217,9 @@ export function AppShell({ user, onLogout }: { user: SessionUser; onLogout: () =
             <p className="text-xs text-muted-foreground">
               © 2025 Workbook Generator · Buat buku panduan kerja otomatis
             </p>
-            <p className="text-xs text-muted-foreground">Generate · Preview · Export</p>
+            <p className="text-xs text-muted-foreground/80">
+              Developed by <span className="font-medium">Arah Daya Consulting</span> · Coach Tegar Prajaksa, MBA
+            </p>
           </div>
         </footer>
       </div>

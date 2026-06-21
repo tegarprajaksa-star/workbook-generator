@@ -156,6 +156,9 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
           <p className="text-center text-xs text-muted-foreground mt-8">
             © 2025 Workbook Generator
           </p>
+          <p className="text-center text-[11px] text-muted-foreground/70 mt-1">
+            Developed by Arah Daya Consulting · Coach Tegar Prajaksa, MBA
+          </p>
         </div>
       </div>
     </div>
