@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, Lock, Mail, Loader2, Sparkles, FileText, Download, Wand2 } from 'lucide-react'
+import { BookOpen, Lock, Mail, Loader2, Sparkles, FileText, Download, Wand2, User, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +9,8 @@ import { toast } from 'sonner'
 import { api, type SessionUser } from '@/lib/bpm-types'
 
 export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void }) {
+  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,20 +19,30 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
     e.preventDefault()
     setLoading(true)
     try {
-      const data = await api<{ user: SessionUser }>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      })
-      toast.success(`Selamat datang, ${data.user.name}!`)
-      onLogin(data.user)
+      if (mode === 'login') {
+        const data = await api<{ user: SessionUser }>('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        })
+        toast.success(`Selamat datang, ${data.user.name}!`)
+        onLogin(data.user)
+      } else {
+        const data = await api<{ user: SessionUser }>('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ name, email, password }),
+        })
+        toast.success(`Akun dibuat. Selamat datang, ${data.user.name}!`)
+        onLogin(data.user)
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Login gagal')
+      toast.error(err instanceof Error ? err.message : (mode === 'login' ? 'Login gagal' : 'Pendaftaran gagal'))
     } finally {
       setLoading(false)
     }
   }
 
   function fillDemo() {
+    setMode('login')
     setEmail('demo@workbookgen.app')
     setPassword('demo123')
   }
@@ -82,21 +94,65 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
         </div>
       </div>
 
-      {/* Right: Login form */}
+      {/* Right: Login/Signup form */}
       <div className="lg:w-1/2 flex items-center justify-center p-6 lg:p-16 bg-background">
         <div className="w-full max-w-md">
-          <div className="mb-8">
+          <div className="mb-6">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-xs font-medium mb-4">
               <Sparkles className="w-3 h-3" />
               Akses Eksklusif
             </div>
-            <h2 className="text-2xl font-bold">Masuk ke Akun</h2>
+            <h2 className="text-2xl font-bold">
+              {mode === 'login' ? 'Masuk ke Akun' : 'Buat Akun Baru'}
+            </h2>
             <p className="text-muted-foreground mt-1">
-              Login untuk mulai membuat buku panduan
+              {mode === 'login'
+                ? 'Login untuk mulai membuat buku panduan'
+                : 'Daftar gratis untuk membuat buku panduan kerja'}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Mode toggle */}
+          <div className="flex gap-1 p-1 rounded-lg bg-muted mb-6">
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                mode === 'login' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Masuk
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('signup')}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                mode === 'signup' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Daftar
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === 'signup' && (
+              <div className="space-y-2">
+                <Label htmlFor="name">Nama Lengkap</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Nama Anda"
+                    className="pl-10"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -120,11 +176,12 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
                 <Input
                   id="password"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder={mode === 'signup' ? 'Minimal 6 karakter' : '••••••••'}
                   className="pl-10"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  minLength={mode === 'signup' ? 6 : undefined}
                 />
               </div>
             </div>
@@ -136,12 +193,41 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
                   Memproses...
                 </>
               ) : (
-                'Masuk'
+                <>
+                  {mode === 'login' ? 'Masuk' : 'Daftar Sekarang'}
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </>
               )}
             </Button>
           </form>
 
-          <div className="mt-8 pt-6 border-t">
+          {/* Switch mode link */}
+          <p className="text-center text-sm text-muted-foreground mt-5">
+            {mode === 'login' ? (
+              <>
+                Belum punya akun?{' '}
+                <button
+                  onClick={() => setMode('signup')}
+                  className="font-semibold text-foreground hover:underline"
+                >
+                  Daftar di sini
+                </button>
+              </>
+            ) : (
+              <>
+                Sudah punya akun?{' '}
+                <button
+                  onClick={() => setMode('login')}
+                  className="font-semibold text-foreground hover:underline"
+                >
+                  Masuk di sini
+                </button>
+              </>
+            )}
+          </p>
+
+          {/* Demo account shortcut */}
+          <div className="mt-6 pt-6 border-t">
             <button
               onClick={fillDemo}
               className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
@@ -153,7 +239,7 @@ export function LoginScreen({ onLogin }: { onLogin: (user: SessionUser) => void 
             </p>
           </div>
 
-          <p className="text-center text-xs text-muted-foreground mt-8">
+          <p className="text-center text-xs text-muted-foreground mt-6">
             © 2025 Workbook Generator
           </p>
           <p className="text-center text-[11px] text-muted-foreground/70 mt-1">

@@ -107,3 +107,20 @@ Work Log:
 Stage Summary:
 - BPMN 2.0 diagram now renders cleanly: swim lanes clearly separated, shapes non-overlapping, arrows routed orthogonally without crossing shapes, YA/TIDAK labels readable
 - VLM verification passed all 5 criteria for both test diagrams
+
+---
+Task ID: 5
+Agent: Orchestrator
+Task: Fix SLA text overlap + add signup option
+
+Work Log:
+- Moved SLA labels out of shapes into separate gray pill badges positioned below each task/gateway (was inside the box overlapping with multi-line labels)
+- Added SlaPill component: small rounded pill (44×14px) with ⏱ icon + SLA text, rendered outside shape bounds
+- Created POST /api/auth/register API route with validation (min 6 char password, duplicate email check)
+- Rebuilt login screen with Masuk/Daftar toggle tabs, name field for signup, switch-mode link
+- Verified: signup creates user + auto-login, duplicate email rejected, short password rejected, login with new account works
+- VLM verified SLA pills: clearly readable, no overlap with shapes or text, positioned cleanly below shapes
+
+Stage Summary:
+- SLA text no longer overlaps — rendered as separate pills below shapes
+- Users can now sign up for a new account without demo credentials (toggle between Masuk and Daftar)

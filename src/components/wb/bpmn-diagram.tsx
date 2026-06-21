@@ -195,15 +195,14 @@ function renderShape(step: BpmnStep, accent: string, compact: boolean) {
       <g>
         <polygon points={`0,${-s} ${s},0 0,${s} ${-s},0`} fill={cfg.fill} stroke={cfg.stroke} strokeWidth={2.5} />
         <text x={0} y={1} textAnchor="middle" dominantBaseline="middle" fontSize={compact ? 13 : 15} fontWeight={800} fill={cfg.text}>?</text>
-        {/* label above */}
+        {/* label above the diamond */}
         <text x={0} y={-s - (compact ? 6 : 8)} textAnchor="middle" fontSize={compact ? 9 : 10} fontWeight={600} fill="#1c1917">
           {wrap(step.label, compact ? 13 : 15).map((ln, i) => (
             <tspan key={i} x={0} dy={i === 0 ? 0 : -11}>{ln}</tspan>
           ))}
         </text>
-        {step.sla && (
-          <text x={0} y={s + (compact ? 16 : 18)} textAnchor="middle" fontSize={8} fill="#78716c">SLA {step.sla}</text>
-        )}
+        {/* SLA pill below the diamond (outside, no overlap) */}
+        {step.sla && <SlaPill sla={step.sla} y={s + 10} compact={compact} />}
       </g>
     )
   }
@@ -230,17 +229,28 @@ function renderShape(step: BpmnStep, accent: string, compact: boolean) {
       <text x={0} y={-h / 2 + 9} textAnchor="middle" fontSize={7} fontWeight={700} fill={cfg.text} opacity={0.65}>
         {cfg.label.toUpperCase()}
       </text>
-      {/* label */}
-      <text x={0} y={2} textAnchor="middle" fontSize={compact ? 9 : 10} fontWeight={600} fill="#1c1917">
+      {/* label (centered, no SLA inside to avoid overlap) */}
+      <text x={0} y={lines.length > 1 ? -1 : 3} textAnchor="middle" fontSize={compact ? 9 : 10} fontWeight={600} fill="#1c1917">
         {lines.map((ln, i) => (
           <tspan key={i} x={0} dy={i === 0 ? 0 : 11}>{ln}</tspan>
         ))}
       </text>
-      {step.sla && (
-        <text x={0} y={h / 2 - 5} textAnchor="middle" fontSize={8} fill="#78716c" fontWeight={600}>
-          ⏱ {step.sla}
-        </text>
-      )}
+      {/* SLA pill below the box (outside, no overlap) */}
+      {step.sla && <SlaPill sla={step.sla} y={h / 2 + 10} compact={compact} />}
+    </g>
+  )
+}
+
+// Small SLA pill rendered outside shapes to avoid text overlap
+function SlaPill({ sla, y, compact }: { sla: string; y: number; compact: boolean }) {
+  const pw = compact ? 38 : 44
+  const ph = 14
+  return (
+    <g transform={`translate(0, ${y})`}>
+      <rect x={-pw / 2} y={-ph / 2} width={pw} height={ph} rx={7} fill="#f5f5f4" stroke="#d6d3d1" strokeWidth={0.8} />
+      <text x={0} y={1} textAnchor="middle" dominantBaseline="middle" fontSize={compact ? 7 : 8} fontWeight={700} fill="#57534e">
+        ⏱ {sla}
+      </text>
     </g>
   )
 }
