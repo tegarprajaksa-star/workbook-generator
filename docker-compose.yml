@@ -1,0 +1,23 @@
+# Docker Compose - untuk jalan 1 command di server
+# Aplikasi + Nginx (reverse proxy) + SSL otomatis
+
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: workbook-app
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      # Database tersimpan di server (tidak hilang saat restart)
+      - ./db:/app/db
+    environment:
+      - DATABASE_URL=file:/app/db/custom.db
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/auth/me"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

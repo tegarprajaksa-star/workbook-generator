@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+dev.log
+*.log
+db/*.db
+db/*.db-journal
+upload/
+download/
+verify-screenshots/
+tmp/

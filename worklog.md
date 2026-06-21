@@ -464,3 +464,31 @@ Stage Summary:
 - "Buat Baru" sidebar button fixed: now opens create dialog instead of infinite spinner
 - New users get auto-created sample workbook (Customer Service Representative) as reference example
 - Sample workbook is complete: job desc, authority, responsibilities, duties, 8 KRAs, 2 BPMN processes with SOPs
+
+---
+Task ID: 14
+Agent: Orchestrator
+Task: Prepare deployment files + panduan sederhana untuk user "terima beres"
+
+Work Log:
+- Created Dockerfile (multi-stage build, production-ready)
+- Created docker-compose.yml (persistent DB volume, auto-restart, healthcheck)
+- Created deploy.sh script otomatis (user tinggal run 1 command)
+- Created .dockerignore (build lebih cepat)
+- Created .env.production + .env.production.example
+- Created PANDUAN_DEPLOY.md — panduan bahasa awam step-by-step:
+  - 3 hal yang perlu dibeli (domain, VPS, Cloudflare gratis)
+  - 8 langkah deploy dari upload code sampai HTTPS
+  - Troubleshooting + backup + update guide
+- Tested production build: `bun run build` berhasil, semua 15 API routes ter-build
+- All deploy files ready: Dockerfile, docker-compose.yml, deploy.sh, PANDUAN_DEPLOY.md
+
+Stage Summary:
+- Project siap deploy "terima beres" — user tinggal:
+  1. Beli VPS + domain
+  2. Upload project ke VPS
+  3. Run `bash deploy.sh`
+  4. Setting domain di Cloudflare
+- Docker-based: jalan di server manapun (Ubuntu, Debian, dll)
+- SQLite dengan persistent volume: data tidak hilang saat restart
+- Panduan lengkap dalam Bahasa Indonesia, bahasa awam
