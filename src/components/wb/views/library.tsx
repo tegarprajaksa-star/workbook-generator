@@ -23,11 +23,12 @@ import { api, type SessionUser, type Workbook } from '@/lib/bpm-types'
 import { toast } from 'sonner'
 
 export function LibraryView({
-  user: _user, onOpenBuilder, onOpenPreview,
+  user: _user, onOpenBuilder, onOpenPreview, createDialogTrigger = 0,
 }: {
   user: SessionUser
   onOpenBuilder: (wb?: Workbook) => void
   onOpenPreview: (wb: Workbook) => void
+  createDialogTrigger?: number
 }) {
   const [workbooks, setWorkbooks] = useState<Workbook[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,9 +36,29 @@ export function LibraryView({
   const [form, setForm] = useState({ positionTitle: '', companyName: '', title: '' })
   const [creating, setCreating] = useState(false)
 
+  // Open create dialog when triggered from sidebar
+  useEffect(() => {
+    if (createDialogTrigger > 0) {
+      setCreateOpen(true)
+      setForm({ positionTitle: '', companyName: '', title: '' })
+    }
+  }, [createDialogTrigger])
+
   const load = useCallback(() => {
     api<{ workbooks: Workbook[] }>('/workbooks')
-      .then((d) => setWorkbooks(d.workbooks))
+      .then(async (d) => {
+        setWorkbooks(d.workbooks)
+        // Auto-create sample workbook for new users with no workbooks
+        if (d.workbooks.length === 0) {
+          try {
+            await api('/workbooks/sample', { method: 'POST' })
+            const refreshed = await api<{ workbooks: Workbook[] }>('/workbooks')
+            setWorkbooks(refreshed.workbooks)
+          } catch {
+            // ignore sample creation errors
+          }
+        }
+      })
       .catch(() => toast.error('Gagal memuat workbook'))
       .finally(() => setLoading(false))
   }, [])

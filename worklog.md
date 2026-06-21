@@ -362,3 +362,105 @@ Stage Summary:
 - No demo account — users must register (MASTER_ADMIN: admin@workbookgen.app / admin123)
 - Full admin panel with user management (block/unblock/add/delete/role change)
 - 3-tier role system: MASTER_ADMIN > ADMIN > USER with proper access control
+
+---
+
+## Task ID: 13-verify — Verify Buat Baru fix and sample workbook
+
+**Date:** 21 Jun (UTC)
+**Subagent:** general-purpose verification agent
+
+### Goal
+Verify two recent fixes/behaviors in the Next.js app at /home/z/my-project:
+1. "Buat Baru" sidebar button opens the create-workbook dialog (no infinite spinner).
+2. A new user is auto-provisioned with a sample workbook on signup.
+
+### Dev server startup notes
+- `bun run dev` (package.json script) pipes stdout through `tee dev.log`, which caused the backgrounded process to die ~10s after the launching shell exited.
+- Fix used: `( setsid nohup ./node_modules/.bin/next dev -p 3000 </dev/null >dev.log 2>&1 & )` — fully detaches from controlling terminal; server stayed up for the whole verification session.
+
+### Verification 1 — "Buat Baru" sidebar button (✓ PASS)
+Steps:
+- Logged in as master admin: `admin@workbookgen.app` / `admin123` → landed on Library page.
+- Snapshot showed sidebar button "Buat Baru" / "Mulai workbook baru" (ref=e10).
+- Clicked the button.
+- **EXPECTED:** Dialog opens with title "Buat Workbook Baru" and fields Posisi/Jabatan, Nama Perusahaan, Judul Workbook.
+- **ACTUAL:** Dialog opened immediately. Snapshot confirmed:
+  - heading "Buat Workbook Baru" [level=2]
+  - textbox "Posisi / Jabatan *" [required]
+  - textbox "Nama Perusahaan"
+  - textbox "Judul Workbook (opsional)"
+  - buttons "Batal" and "Buat & Lanjut Edit"
+- **No "Memuat workbook…" spinner appeared** — the previous infinite-spinner bug is fixed.
+- Screenshot: `verify-screenshots/01-buat-baru-dialog.png`
+
+Root cause of fix (source inspection):
+- `src/components/wb/app-shell.tsx:99` — "Buat Baru" button now does `setView('library'); setCreateDialogTrigger(d => d + 1)` instead of navigating to the builder view that previously triggered the spinner.
+- `src/components/wb/views/library.tsx:41-45` — `useEffect` watches `createDialogTrigger` and calls `setCreateOpen(true)`, opening the Dialog at line 216.
+
+### Verification 2 — Sample workbook for new users (✓ PASS)
+Steps:
+- Clicked "Keluar" → logged out (toast: "Berhasil logout").
+- Clicked "Daftar" tab on auth page → switched to "Buat Akun Baru" form.
+- Filled: Nama Lengkap `Verify Test`, Email `verify@test.com`, Password `verify123` → clicked "Daftar Sekarang".
+- Toast: "Akun dibuat. Selamat datang, Verify Test!"
+- Landed on Library page; snapshot showed:
+  - "1 buku panduan kerja tersimpan"
+  - Workbook card titled **"Buku Kerja Customer Service Representative"**
+  - Company: "Contoh Perusahaan"  •  Position: "Customer Service Representative"
+  - Status: "Selesai"  •  "2 proses"  •  Date: "21 Jun"
+- Screenshot: `verify-screenshots/02-sample-workbook-library.png`
+
+Network trace (during signup) confirmed the backend auto-create call:
+- `POST /api/workbooks/sample` → 200`
+- followed by `GET /api/workbooks` → 200 (refreshed list now contains the sample)
+
+Opened the sample workbook (clicked "Buka"):
+- View switched to "Preview & Export" (state-based, URL unchanged at `/`).
+- Preview contained:
+  - Cover page with "Job Description • BPMN 2.0 • SOP • Work Instruction • Form • KRA"
+  - Section 1 Job Description, Section 2 Wewenang & Tanggung Jawab, Section 3 Tugas Pokok, Section 4 KRA table
+  - **Two "Alur Proses (BPMN 2.0)" headings, each followed by an `SvgRoot` (BPMN diagram) with swimlanes Customer / CS Representative / Supervisor** — matches the "2 proses" badge on the library card.
+- Export buttons visible: Edit, DOCX, Export PPT (no PDF — matches earlier task decision).
+- Screenshots: `verify-screenshots/03-preview-bpmn.png` (full page), `verify-screenshots/04-preview-bpmn-diagram.png` (scrolled to diagram).
+
+### Console errors
+None. `agent-browser errors` returned empty; `agent-browser console` only showed React DevTools info, HMR connected, and Fast Refresh rebuild messages (expected for dev mode).
+
+### Summary
+| Check | Result |
+|---|---|
+| "Buat Baru" opens create dialog (no spinner) | ✅ PASS |
+| New user gets auto-created sample workbook | ✅ PASS |
+| Sample workbook opens in preview with BPMN diagrams | ✅ PASS (2 BPMN 2.0 diagrams with swimlanes) |
+| Console errors | ✅ None |
+
+### Artifacts
+- `/home/z/my-project/verify-screenshots/01-buat-baru-dialog.png`
+- `/home/z/my-project/verify-screenshots/02-sample-workbook-library.png`
+- `/home/z/my-project/verify-screenshots/03-preview-bpmn.png`
+- `/home/z/my-project/verify-screenshots/04-preview-bpmn-diagram.png`
+
+
+---
+Task ID: 13
+Agent: Orchestrator
+Task: Fix Buat Baru sidebar bug + add sample workbook for new users
+
+Work Log:
+- Fixed "Buat Baru" sidebar bug: previously called openBuilder() with no workbook arg, which set view='builder' with activeWorkbook=null, causing BuilderView to show infinite "Memuat workbook..." spinner
+- Fix: sidebar button now navigates to library + triggers create dialog via createDialogTrigger state (increment counter → useEffect in LibraryView opens dialog)
+- Created POST /api/workbooks/sample endpoint: creates "Buku Kerja Customer Service Representative" example workbook with 2 BPMN processes (Inbound Inquiry Handling, Complaint Resolution), 8 KRAs, full job desc — only if user has 0 workbooks (idempotent)
+- Updated LibraryView load(): when user has 0 workbooks, auto-call /workbooks/sample to create reference example, then reload
+- New users now see a complete sample workbook in their library on first login as a reference
+
+Verification (by subagent):
+1. "Buat Baru" button: opens create dialog "Buat Workbook Baru" immediately — no more spinner ✅
+2. New user signup: library shows 1 sample workbook "Buku Kerja Customer Service Representative" with 2 proses ✅
+3. Sample workbook opens in preview with BPMN diagrams (Customer/CS Representative/Supervisor lanes) ✅
+4. Zero console errors
+
+Stage Summary:
+- "Buat Baru" sidebar button fixed: now opens create dialog instead of infinite spinner
+- New users get auto-created sample workbook (Customer Service Representative) as reference example
+- Sample workbook is complete: job desc, authority, responsibilities, duties, 8 KRAs, 2 BPMN processes with SOPs
