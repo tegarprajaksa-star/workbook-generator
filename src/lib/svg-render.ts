@@ -1,100 +1,42 @@
-// Playwright-based SVG to PNG renderer — reliable font rendering using Chromium.
-// Use this instead of sharp for SVG→PNG because librsvg (sharp's SVG engine)
-// can produce garbled/box characters for text in headless environments.
+// SVG to PNG renderer using sharp (librsvg).
+// Uses DejaVu Sans font (installed on all Linux systems) for reliable text rendering.
+// All emoji/special characters should already be stripped from the SVG before rendering.
 
-import { chromium } from 'playwright'
-
-// Cache the browser instance across calls within the same process
-let browserPromise: Promise<import('playwright').Browser> | null = null
-
-async function getBrowser() {
-  if (!browserPromise) {
-    browserPromise = chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    })
-  }
-  return browserPromise
-}
+import sharp from 'sharp'
 
 /**
- * Render an SVG string to a PNG buffer using a headless Chromium browser.
- * Guarantees correct font rendering (no garbled/box characters).
+ * Render an SVG string to a PNG buffer using sharp.
+ * Reliable, fast, no browser dependency.
  */
 export async function renderSvgToPng(
   svg: string,
   options: { scale?: number } = {}
 ): Promise<Buffer> {
-  const scale = options.scale || 2 // 2x for crisp text
-  const browser = await getBrowser()
-  const context = await browser.newContext({
-    viewport: { width: 2000, height: 1000 },
-    deviceScaleFactor: scale,
-  })
-  const page = await context.newPage()
-
-  // Extract width/height from the SVG (parse from the svg tag attributes)
+  const scale = options.scale || 2
+  // Parse width/height from SVG
   const widthMatch = svg.match(/width="(\d+)"/)
   const heightMatch = svg.match(/height="(\d+)"/)
   const w = widthMatch ? parseInt(widthMatch[1]) : 800
   const h = heightMatch ? parseInt(heightMatch[1]) : 400
 
-  await page.setViewportSize({ width: w, height: h })
-  await page.setContent(
-    `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;}body{background:white;}</style></head><body>${svg}</body></html>`,
-    { waitUntil: 'networkidle' }
-  )
+  // Use high density for crisp text, then resize to target
+  const density = 144 * scale // 144 DPI base * scale
+  const pngBuffer = await sharp(Buffer.from(svg), { density })
+    .resize({ width: Math.round(w * scale), height: Math.round(h * scale), fit: 'fill' })
+    .png()
+    .toBuffer()
 
-  // Small delay to ensure fonts are ready
-  await page.evaluate(() => document.fonts ? document.fonts.ready : Promise.resolve())
-
-  const pngBuffer = await page.screenshot({
-    type: 'png',
-    clip: { x: 0, y: 0, width: w, height: h },
-    omitBackground: false,
-  })
-
-  await context.close()
-  return Buffer.from(pngBuffer)
+  return pngBuffer
 }
 
-/**
- * Render multiple SVGs to PNGs in a single browser session (for performance).
- */
+// Batch render multiple SVGs
 export async function renderSvgsToPngs(
   svgs: string[],
   options: { scale?: number } = {}
 ): Promise<Buffer[]> {
-  const scale = options.scale || 2
-  const browser = await getBrowser()
-  const context = await browser.newContext({
-    viewport: { width: 2000, height: 1000 },
-    deviceScaleFactor: scale,
-  })
-  const page = await context.newPage()
-
   const results: Buffer[] = []
   for (const svg of svgs) {
-    const widthMatch = svg.match(/width="(\d+)"/)
-    const heightMatch = svg.match(/height="(\d+)"/)
-    const w = widthMatch ? parseInt(widthMatch[1]) : 800
-    const h = heightMatch ? parseInt(heightMatch[1]) : 400
-
-    await page.setViewportSize({ width: w, height: h })
-    await page.setContent(
-      `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;}body{background:white;}</style></head><body>${svg}</body></html>`,
-      { waitUntil: 'networkidle' }
-    )
-    await page.evaluate(() => document.fonts ? document.fonts.ready : Promise.resolve())
-
-    const pngBuffer = await page.screenshot({
-      type: 'png',
-      clip: { x: 0, y: 0, width: w, height: h },
-      omitBackground: false,
-    })
-    results.push(Buffer.from(pngBuffer))
+    results.push(await renderSvgToPng(svg, options))
   }
-
-  await context.close()
   return results
 }

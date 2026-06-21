@@ -29,7 +29,7 @@ function escapeXml(s: string): string {
 }
 
 function truncate(s: string, n: number): string {
-  return s.length > n ? s.slice(0, n - 1) + '…' : s
+  return s.length > n ? s.slice(0, n - 1) + '...' : s
 }
 
 function wrap(text: string, maxChars: number): string[] {

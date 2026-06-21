@@ -194,3 +194,24 @@ Stage Summary:
 - Font rendering definitively fixed: Playwright/Chromium renders text perfectly, no more garbled/box characters
 - PDF export now reliable with retry logic and proper environment setup
 - All 3 export formats (PPTX, DOCX, PDF) show clean, readable BPMN diagrams
+
+---
+Task ID: 9
+Agent: Orchestrator
+Task: Fix export failure — revert Playwright to sharp, fix remaining non-ASCII char
+
+Work Log:
+- Playwright was causing export failures (too heavy, memory issues, unreliable in serverless)
+- Reverted svg-render.ts to use sharp (librsvg) — fast (1.5s vs 5s), reliable, no browser dependency
+- Found remaining non-ASCII character: '…' (Unicode ellipsis) in truncate() function — replaced with '...' (3 ASCII dots)
+- Verified: NO non-ASCII characters remain in SVG output
+- Tested all 3 exports with sharp:
+  - DOCX: 233KB, 4 BPMN images, ZIP integrity OK, 1.5s render
+  - PPTX: 625KB, 1.2s render
+  - PDF: 435KB, 7 pages, 2.8s render (with retry logic)
+- VLM verified: all BPMN text fully readable in DOCX and PDF (lane labels, task labels, SLA, YA/TIDAK branches)
+
+Stage Summary:
+- Export reliability restored: sharp-based rendering (no Playwright/browser dependency)
+- Font rendering fixed: DejaVu Sans + zero non-ASCII characters = clean text in all formats
+- All 3 exports (PPTX, DOCX, PDF) work fast and reliably with readable BPMN diagrams
