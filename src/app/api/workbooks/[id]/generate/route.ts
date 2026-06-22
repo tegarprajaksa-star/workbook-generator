@@ -17,6 +17,9 @@ async function callAI(prompt: string): Promise<string> {
     throw new Error('AI belum dikonfigurasi. Hubungi administrator untuk set API key.')
   }
 
+  // Random seed untuk variasi output setiap generate
+  const seed = Math.floor(Math.random() * 1000000)
+
   const response = await fetch(GROQ_URL, {
     method: 'POST',
     headers: {
@@ -26,10 +29,23 @@ async function callAI(prompt: string): Promise<string> {
     body: JSON.stringify({
       model: GROQ_MODEL,
       messages: [
-        { role: 'system', content: 'Anda adalah konsultan HR & BPMN ahli. Selalu kembalikan JSON valid saja, tanpa markdown atau teks lain.' },
+        { role: 'system', content: `Anda adalah konsultan HR & BPMN ahli berpengalaman 15 tahun. Anda ahli dalam menyusun Buku Kerja Karyawan, SOP, BPMN 2.0, dan KRA untuk berbagai industri.
+
+PENTING:
+- Setiap generate HARUS menghasilkan konten yang UNIK dan SPESIFIK untuk posisi & industri yang diminta
+- JANGAN gunakan template generic — buat proses bisnis yang benar-benar relevan dengan pekerjaan harian posisi tersebut
+- Gunakan istilah teknis yang sesuai industri (bukan istilah umum)
+- Setiap proses harus punya nama yang spesifik dan deskriptif (bukan "Proses 1", "Proses 2")
+- Steps BPMN harus detail dengan aktivitas yang realistis untuk posisi tersebut
+- SOP/WI harus berisi langkah teknis konkret, bukan generik
+- KRA harus spesifik dan measurable untuk posisi tersebut
+- Variasikan struktur proses: tidak semua proses punya gateway, beberapa bisa linear
+- Random creativity seed: ${seed}
+
+Selalu kembalikan JSON valid saja, tanpa markdown atau teks lain.` },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.7,
+      temperature: 0.9, // higher = more creative/varied
       max_tokens: 8000,
     }),
   })
@@ -138,34 +154,51 @@ Kembalikan HANYA JSON valid (array):
     }
 
     if (section === 'processes') {
-      const prompt = `Anda adalah konsultan BPMN ahli. Buat 4-6 proses bisnis penting untuk posisi "${pos}" di "${comp}" (industri: ${ind}).
-Untuk setiap proses, buat: kode (P01, P02...), nama, deskripsi, input, output, totalSla, kategori, lanes (3-4 nama), steps (BPMN dengan type START/TASK/GATEWAY/END/CORRECTION, lane index, label, sla, order, branchLabel YA/TIDAK), sops (6 langkah dengan instruction, workInstruction, output), dan forms.
+      const prompt = `Buat 4-6 PROSES BISNIS yang SPESIFIK dan UNIK untuk posisi "${pos}" di perusahaan "${comp}" (industri: ${ind}).
 
-Gunakan standar BPMN 2.0: setiap gateway WAJIB punya dua arah (YA lanjut, TIDAK koreksi).
+PENTING — buat proses yang BENAR-BENAR relevan dengan pekerjaan harian "${pos}", bukan template generic!
 
-Kembalikan HANYA JSON valid (array of proses):
+Contoh pendekatan (JANGAN copy — buat yang sesuai posisi "${pos}"):
+- Proses yang berkaitan dengan awal/menutup shift kerja
+- Proses penanganan transaksi/layanan utama
+- Proses penanganan masalah/komplain/exception
+- Proses pelaporan/kontrol kualitas/audit
+- Proses koordinasi dengan departemen lain
+- Proses maintenance/perawatan/stock
+
+Setiap proses HARUS:
+1. Punya NAMA spesifik (bukan "Proses 1") — contoh: "Penanganan Pesanan Online", "Prosedur Closing Harian", dll
+2. Punya lanes (peran terlibat) yang realistis untuk posisi "${pos}"
+3. Steps BPMN dengan aktivitas KONKRIT yang dilakukan "${pos}" di lapangan
+4. SOP dengan instruksi teknis detail (bukan generik seperti "lakukan tugas")
+5. SLA yang realistis
+6. Variasikan: beberapa proses linear, beberapa dengan gateway (decision point), beberapa dengan correction branch
+
+Total 4-6 proses. Gunakan kode P01, P02, dst.
+
+JSON format:
 [
   {
     "code": "P01",
-    "name": "...",
-    "description": "...",
-    "inputText": "...",
-    "outputText": "...",
+    "name": "nama proses spesifik",
+    "description": "deskripsi 1-2 kalimat",
+    "inputText": "apa yang memicu proses ini",
+    "outputText": "apa hasil akhir proses",
     "totalSla": "± X menit",
-    "category": "Operations",
-    "lanes": ["Role1", "Role2", "Role3"],
+    "category": "Operations/Service/Quality/Admin",
+    "lanes": ["Peran1", "Peran2"],
     "steps": [
-      {"type":"START","lane":0,"label":"...","sla":"","order":1},
-      {"type":"TASK","lane":0,"label":"...","sla":"X mnt","order":2},
-      {"type":"GATEWAY","lane":0,"label":"...?","sla":"1 mnt","order":3,"branchLabel":"","yesTargetOrder":4,"noTargetOrder":8},
-      {"type":"CORRECTION","lane":1,"label":"...","sla":"X mnt","order":8,"branchLabel":"TIDAK"},
+      {"type":"START","lane":0,"label":"pemicu","sla":"","order":1},
+      {"type":"TASK","lane":0,"label":"aktivitas konkret","sla":"X mnt","order":2},
+      {"type":"GATEWAY","lane":0,"label":"pertanyaan konkret?","sla":"1 mnt","order":3,"branchLabel":"","yesTargetOrder":4,"noTargetOrder":8},
+      {"type":"CORRECTION","lane":1,"label":"aksi koreksi spesifik","sla":"X mnt","order":8,"branchLabel":"TIDAK"},
       {"type":"END","lane":1,"label":"END","sla":"","order":9}
     ],
     "sops": [
-      {"instruction":"...","workInstruction":"...","output":"..."}
+      {"instruction":"langkah konkret","workInstruction":"detail teknis cara melakukannya","output":"hasil/bukti"}
     ],
     "forms": [
-      {"label":"Item","standard":"Standar"}
+      {"label":"field","standard":"standar"}
     ]
   }
 ]`
@@ -200,19 +233,44 @@ Kembalikan HANYA JSON valid (array of proses):
     }
 
     // ---------- FULL GENERATION ----------
-    const prompt = `Anda adalah konsultan HR & BPMN ahli yang menyusun Buku Kerja Karyawan lengkap.
-Buat Buku Kerja lengkap untuk posisi "${pos}" di perusahaan "${comp}" (industri: ${ind}).
-${ctx ? `Konteks: ${ctx}` : ''}
+    const prompt = `Buat Buku Kerja Karyawan LENGKAP untuk posisi "${pos}" di perusahaan "${comp}" (industri: ${ind}).
+${ctx ? `Konteks tambahan: ${ctx}` : ''}
 
-Kembalikan HANYA JSON valid (tanpa markdown) dengan struktur:
+Buat konten yang SPESIFIK dan UNIK untuk posisi "${pos}" — bukan template generic!
+
+STRUKTUR YANG DIBUTUHKAN:
+
+1. JOB DESCRIPTION:
+- Department, reportsTo, subordinates yang sesuai industri ${ind}
+- Purpose yang spesifik untuk "${pos}"
+- 5 wewenang konkret (bukan generic)
+- 5 tanggung jawab konkret yang dilakukan "${pos}" sehari-hari
+
+2. TUGAS:
+- Pokok: ringkasan 1 kalimat tugas utama
+- Harian/Mingguan/Bulanan: spesifik untuk "${pos}"
+
+3. KRA (8-10):
+- Buat indikator yang MEASURABLE dan spesifik untuk "${pos}"
+- Bukan generic seperti "akurasi" — buat "akurasi pencatatan transaksi" dll
+
+4. PROSES BISNIS (4-6):
+- Buat proses yang BENAR-BENAR relevan dengan pekerjaan harian "${pos}"
+- Contoh area: opening/closing shift, transaksi utama, penanganan masalah, quality control, koordinasi tim, maintenance
+- Setiap proses punya NAMA spesifik (bukan "Proses 1")
+- Variasikan: beberapa linear, beberapa dengan gateway + correction
+- SOP dengan instruksi teknis konkret
+- Lanes yang realistis untuk posisi "${pos}"
+
+JSON format:
 {
   "title": "Buku Kerja Karyawan ${pos}",
   "department": "...",
   "reportsTo": "...",
   "subordinates": "...",
-  "purpose": "tujuan jabatan",
-  "authority": "5 butir wewenang dipisah \\n",
-  "responsibilities": "5 butir tanggung jawab dipisah \\n",
+  "purpose": "...",
+  "authority": "5 butir dipisah \\n",
+  "responsibilities": "5 butir dipisah \\n",
   "dutiesPrimary": "...",
   "dutiesDaily": "...",
   "dutiesWeekly": "...",
@@ -220,12 +278,12 @@ Kembalikan HANYA JSON valid (tanpa markdown) dengan struktur:
   "kras": [{"name":"...","formula":"...","target":"...","unit":"%"}],
   "processes": [
     {
-      "code":"P01","name":"...","description":"...","inputText":"...","outputText":"...",
-      "totalSla":"± X menit","category":"Operations",
-      "lanes":["Role1","Role2"],
-      "steps":[{"type":"START","lane":0,"label":"...","sla":"","order":1},{"type":"TASK","lane":0,"label":"...","sla":"X mnt","order":2},{"type":"GATEWAY","lane":0,"label":"...?","sla":"1 mnt","order":3,"yesTargetOrder":4,"noTargetOrder":7},{"type":"CORRECTION","lane":1,"label":"...","sla":"X mnt","order":7,"branchLabel":"TIDAK"},{"type":"END","lane":1,"label":"END","sla":"","order":8}],
-      "sops":[{"instruction":"...","workInstruction":"...","output":"..."}],
-      "forms":[{"label":"Item","standard":"Standar"}]
+      "code":"P01","name":"nama spesifik","description":"...","inputText":"...","outputText":"...",
+      "totalSla":"± X menit","category":"Operations/Service/Quality",
+      "lanes":["Peran1","Peran2"],
+      "steps":[{"type":"START","lane":0,"label":"...","sla":"","order":1},{"type":"TASK","lane":0,"label":"aktivitas konkret","sla":"X mnt","order":2},{"type":"GATEWAY","lane":0,"label":"pertanyaan konkret?","sla":"1 mnt","order":3,"yesTargetOrder":4,"noTargetOrder":7},{"type":"CORRECTION","lane":1,"label":"koreksi spesifik","sla":"X mnt","order":7,"branchLabel":"TIDAK"},{"type":"END","lane":1,"label":"END","sla":"","order":8}],
+      "sops":[{"instruction":"langkah konkret","workInstruction":"detail teknis","output":"hasil/bukti"}],
+      "forms":[{"label":"field","standard":"standar"}]
     }
   ]
 }
