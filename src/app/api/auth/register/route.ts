@@ -43,9 +43,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (tokenRecord.usedByUserId) {
+    if (!tokenRecord.isActive) {
       return NextResponse.json(
-        { error: 'Token ini sudah digunakan. Minta token baru dari admin.' },
+        { error: 'Token ini sudah dinonaktifkan oleh admin. Minta token baru.' },
         { status: 400 }
       )
     }
@@ -71,12 +71,11 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Mark token as used
+    // Increment token usage count (token stays active for reuse)
     await db.registrationToken.update({
       where: { id: tokenRecord.id },
       data: {
-        usedByUserId: user.id,
-        usedAt: new Date(),
+        usageCount: { increment: 1 },
       },
     })
 

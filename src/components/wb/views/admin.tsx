@@ -42,8 +42,8 @@ type TokenItem = {
   id: string
   token: string
   note: string
-  usedByUserId: string | null
-  usedAt: string | null
+  isActive: boolean
+  usageCount: number
   createdAt: string
   createdBy: { name: string } | null
 }
@@ -181,6 +181,19 @@ export function AdminView({ user }: { user: SessionUser }) {
   function copyToken(token: string) {
     navigator.clipboard.writeText(token)
     toast.success(`Token ${token} disalin!`)
+  }
+
+  async function toggleToken(t: TokenItem) {
+    try {
+      await api('/admin/tokens', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: t.id, isActive: !t.isActive }),
+      })
+      toast.success(t.isActive ? 'Token dinonaktifkan' : 'Token diaktifkan')
+      load()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal')
+    }
   }
 
   const filtered = users.filter(u =>
@@ -345,31 +358,41 @@ export function AdminView({ user }: { user: SessionUser }) {
               <ScrollArea className="max-h-64">
                 <div className="space-y-2">
                   {tokens.map((t) => (
-                    <div key={t.id} className={`flex items-center gap-2 p-2.5 rounded-lg border ${t.usedByUserId ? 'opacity-50' : 'hover:bg-muted/30'}`}>
-                      <code className={`text-sm font-mono flex-1 ${t.usedByUserId ? 'line-through text-muted-foreground' : 'font-semibold'}`}>
+                    <div key={t.id} className={`flex items-center gap-2 p-2.5 rounded-lg border ${!t.isActive ? 'opacity-50' : 'hover:bg-muted/30'}`}>
+                      <code className={`text-sm font-mono flex-1 ${!t.isActive ? 'line-through text-muted-foreground' : 'font-semibold'}`}>
                         {t.token}
                       </code>
                       {t.note && <span className="text-xs text-muted-foreground hidden sm:inline truncate max-w-32">{t.note}</span>}
-                      {t.usedByUserId ? (
-                        <Badge variant="outline" className="text-[10px] text-stone-500 bg-muted border-0">
-                          Sudah Dipakai
-                        </Badge>
-                      ) : (
+                      <Badge variant="outline" className="text-[10px] text-stone-500 border-0">
+                        {t.usageCount}x dipakai
+                      </Badge>
+                      {t.isActive ? (
                         <Badge variant="outline" className="text-[10px] text-green-600 bg-green-100 dark:bg-green-950/40 border-0">
                           Aktif
                         </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-red-600 bg-red-100 dark:bg-red-950/40 border-0">
+                          Nonaktif
+                        </Badge>
                       )}
-                      {!t.usedByUserId && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => copyToken(t.token)}
-                          title="Copy token"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => toggleToken(t)}
+                        title={t.isActive ? 'Nonaktifkan token' : 'Aktifkan token'}
+                      >
+                        {t.isActive ? <><Ban className="w-3.5 h-3.5 mr-1 text-red-600" />Matikan</> : <><CheckCircle2 className="w-3.5 h-3.5 mr-1 text-green-600" />Aktifkan</>}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => copyToken(t.token)}
+                        title="Copy token"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   ))}
                 </div>

@@ -56,3 +56,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Gagal membuat token' }, { status: 500 })
   }
 }
+
+// PATCH — toggle token active/inactive
+export async function PATCH(req: NextRequest) {
+  try {
+    await requireAdmin()
+    const body = await req.json()
+    const { id, isActive } = body
+
+    if (!id || typeof isActive !== 'boolean') {
+      return NextResponse.json({ error: 'ID dan isActive wajib diisi' }, { status: 400 })
+    }
+
+    const updated = await db.registrationToken.update({
+      where: { id },
+      data: { isActive },
+    })
+
+    return NextResponse.json({ token: updated })
+  } catch (error) {
+    if ((error as Error).message === 'UNAUTHORIZED' || (error as Error).message === 'FORBIDDEN') {
+      return NextResponse.json({ error: 'Akses ditolak' }, { status: 403 })
+    }
+    console.error('Admin toggle token error:', error)
+    return NextResponse.json({ error: 'Gagal mengubah token' }, { status: 500 })
+  }
+}

@@ -35,8 +35,8 @@ model RegistrationToken {
   id          String    @id @default(cuid())
   token       String    @unique
   note        String    @default("") // description of who it's for
-  usedByUserId String?  // null = unused, set when a user registers with it
-  usedAt      DateTime?
+  isActive    Boolean   @default(true) // admin can deactivate
+  usageCount  Int       @default(0) // how many users registered with this token
   createdAt   DateTime  @default(now())
   createdById String    // admin who created it
   createdBy   User      @relation("TokenCreator", fields: [createdById], references: [id], onDelete: Cascade)
