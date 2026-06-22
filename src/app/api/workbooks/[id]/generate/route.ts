@@ -172,7 +172,22 @@ Setiap proses HARUS:
 3. Steps BPMN dengan aktivitas KONKRIT yang dilakukan "${pos}" di lapangan
 4. SOP dengan instruksi teknis detail (bukan generik seperti "lakukan tugas")
 5. SLA yang realistis
-6. Variasikan: beberapa proses linear, beberapa dengan gateway (decision point), beberapa dengan correction branch
+
+ATURAN GATEWAY BPMN (SANGAT PENTING):
+- Setiap GATEWAY HARUS punya 2 cabang: "YA" (lanjut di lane yang sama) dan "TIDAK" (lompat ke lane lain)
+- Cabang "TIDAK" WAJIB lompat ke LANE BERBEDA (lane index beda dari gateway)
+- CORRECTION step WAJIB di lane yang berbeda dari gateway
+- Ini mensimulasikan eskalasi: jika ada masalah, orang lain (supervisor/manager) yang menangani
+- Variasikan: tidak semua gateway ke lane yang sama, buat berbeda-beda
+
+Contoh gateway yang BENAR (lintas lane):
+  GATEWAY di lane 0 "Apakah stok cukup?" → YA: lanjut task di lane 0 | TIDAK: CORRECTION di lane 1 "Minta stok ke supervisor"
+  GATEWAY di lane 1 "Apakah dokumen valid?" → YA: lanjut task di lane 1 | TIDAK: CORRECTION di lane 0 "Koreksi data"
+
+Contoh gateway yang SALAH (tidak lintas lane — JANGAN buat seperti ini):
+  GATEWAY di lane 0 → TIDAK: CORRECTION juga di lane 0 (SALAH! harus beda lane)
+
+Minimum 60% proses harus punya gateway dengan correction lintas lane.
 
 Total 4-6 proses. Gunakan kode P01, P02, dst.
 
@@ -186,12 +201,15 @@ JSON format:
     "outputText": "apa hasil akhir proses",
     "totalSla": "± X menit",
     "category": "Operations/Service/Quality/Admin",
-    "lanes": ["Peran1", "Peran2"],
+    "lanes": ["Peran1", "Peran2", "Peran3"],
     "steps": [
       {"type":"START","lane":0,"label":"pemicu","sla":"","order":1},
       {"type":"TASK","lane":0,"label":"aktivitas konkret","sla":"X mnt","order":2},
-      {"type":"GATEWAY","lane":0,"label":"pertanyaan konkret?","sla":"1 mnt","order":3,"branchLabel":"","yesTargetOrder":4,"noTargetOrder":8},
-      {"type":"CORRECTION","lane":1,"label":"aksi koreksi spesifik","sla":"X mnt","order":8,"branchLabel":"TIDAK"},
+      {"type":"GATEWAY","lane":0,"label":"pertanyaan konkret?","sla":"1 mnt","order":3,"branchLabel":"","yesTargetOrder":4,"noTargetOrder":7},
+      {"type":"TASK","lane":0,"label":"aktivitas YA","sla":"X mnt","order":4,"branchLabel":"YA"},
+      {"type":"END","lane":0,"label":"END","sla":"","order":5},
+      {"type":"CORRECTION","lane":1,"label":"eskalasi/koreksi oleh peran lain","sla":"X mnt","order":7,"branchLabel":"TIDAK"},
+      {"type":"TASK","lane":1,"label":"tindakan koreksi","sla":"X mnt","order":8},
       {"type":"END","lane":1,"label":"END","sla":"","order":9}
     ],
     "sops": [
@@ -206,10 +224,37 @@ JSON format:
       const content = await callAI(prompt)
       const parsed = extractJSON(content) as Array<Record<string, unknown>>
 
+      // AUTO-FIX: ensure gateway correction branches cross lanes
+      const fixedParsed = parsed.map((p) => {
+        const lanes = (p.lanes as string[]) || []
+        const steps = (p.steps as Array<Record<string, unknown>>) || []
+        if (lanes.length < 2) return p // can't cross lanes with only 1 lane
+
+        // Find all gateways
+        const gateways = steps.filter(s => s.type === 'GATEWAY')
+        for (const gw of gateways) {
+          const gwLane = Number(gw.lane)
+          const noTarget = Number(gw.noTargetOrder)
+          // Find the correction step (TIDAK branch target)
+          const correction = steps.find(s => Number(s.order) === noTarget)
+          if (correction) {
+            const corrLane = Number(correction.lane)
+            // If correction is in same lane as gateway, move it to a different lane
+            if (corrLane === gwLane) {
+              // Pick a different lane (cycle through available lanes)
+              const newLane = (gwLane + 1) % lanes.length
+              correction.lane = newLane
+            }
+          }
+        }
+        p.steps = steps
+        return p
+      })
+
       // Save processes to DB
       await db.workbookProcess.deleteMany({ where: { workbookId: id } })
-      for (let i = 0; i < parsed.length; i++) {
-        const p = parsed[i] as Record<string, unknown>
+      for (let i = 0; i < fixedParsed.length; i++) {
+        const p = fixedParsed[i] as Record<string, unknown>
         await db.workbookProcess.create({
           data: {
             workbookId: id,
@@ -229,7 +274,7 @@ JSON format:
         })
       }
 
-      return NextResponse.json({ section: 'processes', data: parsed, count: parsed.length })
+      return NextResponse.json({ section: 'processes', data: fixedParsed, count: fixedParsed.length })
     }
 
     // ---------- FULL GENERATION ----------
@@ -293,6 +338,26 @@ Buat 4-6 proses. Setiap gateway WAJIB dua arah. SOP 5-7 langkah per proses.`
     const content = await callAI(prompt)
     const parsed = extractJSON(content) as Record<string, unknown>
 
+    // AUTO-FIX: ensure gateway correction branches cross lanes
+    if (parsed.processes && Array.isArray(parsed.processes)) {
+      parsed.processes = (parsed.processes as Array<Record<string, unknown>>).map((p) => {
+        const lanes = (p.lanes as string[]) || []
+        const steps = (p.steps as Array<Record<string, unknown>>) || []
+        if (lanes.length < 2) return p
+        const gateways = steps.filter(s => s.type === 'GATEWAY')
+        for (const gw of gateways) {
+          const gwLane = Number(gw.lane)
+          const noTarget = Number(gw.noTargetOrder)
+          const correction = steps.find(s => Number(s.order) === noTarget)
+          if (correction && Number(correction.lane) === gwLane) {
+            correction.lane = (gwLane + 1) % lanes.length
+          }
+        }
+        p.steps = steps
+        return p
+      })
+    }
+
     // Save everything to DB
     await db.workbook.update({
       where: { id },
@@ -315,8 +380,8 @@ Buat 4-6 proses. Setiap gateway WAJIB dua arah. SOP 5-7 langkah per proses.`
 
     if (parsed.processes && Array.isArray(parsed.processes)) {
       await db.workbookProcess.deleteMany({ where: { workbookId: id } })
-      for (let i = 0; i < parsed.processes.length; i++) {
-        const p = parsed.processes[i] as Record<string, unknown>
+      for (let i = 0; i < (parsed.processes as Array<Record<string, unknown>>).length; i++) {
+        const p = (parsed.processes as Array<Record<string, unknown>>)[i]
         await db.workbookProcess.create({
           data: {
             workbookId: id,
