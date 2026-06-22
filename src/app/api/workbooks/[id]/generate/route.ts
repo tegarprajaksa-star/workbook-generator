@@ -34,6 +34,14 @@ ATURAN MUTLAK:
 6. Prediksi risiko nyata yang bisa terjadi di posisi tersebut
 7. Random seed ${seed} — pastikan variasi maksimal
 
+ATURAN BAHASA INDONESIA (SANGAT PENTING):
+- Gunakan tata bahasa Indonesia yang BENAR dan NATURAL
+- Pertanyaan gateway HARUS diawali dengan "Apakah..." atau langsung kata tanya
+- Contoh BENAR: "Apakah keluhan dapat diselesaikan?", "Apakah stok mencukupi?", "Apakah dokumen valid?"
+- Contoh SALAH (terbalik): "diselesaikan dapat apakah keluhan?", "mencukupi apakah stok?"
+- Struktur kalimat: Subjek + Predikat + Objek (S-P-O), bukan terbalik
+- Hindari kata-kata robotik, gunakan bahasa natural seperti percakapan profesional
+
 Kembalikan HANYA JSON valid, tanpa markdown.`
 
   const response = await fetch(GROQ_URL, {
