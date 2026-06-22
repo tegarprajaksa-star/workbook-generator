@@ -44,36 +44,76 @@ ATURAN BAHASA INDONESIA (SANGAT PENTING):
 
 Kembalikan HANYA JSON valid, tanpa markdown.`
 
-  const response = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [
-        { role: 'system', content: sys },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.95,
-      max_tokens: 8000,
-      top_p: 0.9,
-    }),
-  })
+  // Auto-retry with exponential backoff
+  const MAX_RETRIES = 5
+  const RETRY_DELAYS = [2000, 5000, 10000, 20000, 30000] // 2s, 5s, 10s, 20s, 30s
 
-  if (!response.ok) {
-    const errText = await response.text()
-    console.error('Groq API error:', response.status, errText)
-    if (response.status === 429) throw new Error('Limit AI tercapai. Coba lagi beberapa menit lagi.')
-    if (response.status === 401) throw new Error('API key tidak valid. Hubungi administrator.')
-    throw new Error('AI error: ' + response.status)
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [
+            { role: 'system', content: sys },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.95,
+          max_tokens: 8000,
+          top_p: 0.9,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const text = data.choices?.[0]?.message?.content || ''
+        if (!text) throw new Error('AI tidak memberikan respons. Coba lagi.')
+        return text
+      }
+
+      // Handle errors
+      if (response.status === 401) {
+        throw new Error('API key tidak valid. Hubungi administrator.')
+      }
+
+      // 429 (rate limit) or 500/503 (server error) — retry
+      if (response.status === 429 || response.status >= 500) {
+        lastError = new Error(response.status === 429 ? 'Limit AI tercapai' : `Server error ${response.status}`)
+        console.log(`AI attempt ${attempt + 1}/${MAX_RETRIES} failed (${response.status}), retrying in ${RETRY_DELAYS[attempt] / 1000}s...`)
+
+        if (attempt < MAX_RETRIES - 1) {
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt]))
+          continue
+        }
+      }
+
+      // Other errors — don't retry
+      const errText = await response.text()
+      console.error('Groq API error:', response.status, errText)
+      throw new Error('AI error: ' + response.status)
+    } catch (err) {
+      // Network errors — retry
+      if (err instanceof Error && (err.message.includes('fetch') || err.message.includes('connect'))) {
+        lastError = err
+        console.log(`AI attempt ${attempt + 1}/${MAX_RETRIES} network error, retrying...`)
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt]))
+          continue
+        }
+      }
+      throw err
+    }
   }
 
-  const data = await response.json()
-  const text = data.choices?.[0]?.message?.content || ''
-  if (!text) throw new Error('AI tidak memberikan respons. Coba lagi.')
-  return text
+  // All retries exhausted
+  throw new Error(lastError?.message || 'AI gagal setelah beberapa percobaan. Coba lagi dalam beberapa menit.')
 }
 
 function extractJSON(text: string): unknown {
